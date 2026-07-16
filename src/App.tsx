@@ -43,8 +43,9 @@ interface ErroDetalhado {
   explicacao_erro: string;
 }
 
+// ✅ ID REAL do jogo na tabela `jogos`
 const ATIVIDADE_ID = '80093822-405a-4be4-807e-202888024ee4';
-const TOTAL_FIGURINHAS = 42; // Atualizado para 42 (inclui as 3 da Junta Militar)
+const TOTAL_FIGURINHAS = 42;
 const ALBUM_ID_FIXO = 'bb84b6cb-7a73-4ca9-8f52-22d8863e6e59';
 
 // IDs reais dos descritores BNCC para 9º ano de História
@@ -120,7 +121,6 @@ export default function App() {
 
   const albumRef = useRef<HTMLDivElement>(null);
 
-  // Alterar título do navegador
   useEffect(() => {
     document.title = '🏛️ Álbum dos Presidentes do Brasil - SACI SABIDO';
   }, []);
@@ -138,7 +138,6 @@ export default function App() {
   const inicializarAtividade = async () => {
     setLoading(true);
     try {
-      // 1. Buscar dados do aluno
       const { data: alunoData } = await supabase.from('alunos').select('nome_aluno, turma_id').eq('id', alunoId).single();
       if (alunoData) {
         setAlunoNome(alunoData.nome_aluno);
@@ -149,11 +148,9 @@ export default function App() {
         }
       }
 
-      // 2. Usar o ID fixo do álbum
       const albumIdFixed = ALBUM_ID_FIXO;
       setAlbumId(albumIdFixed);
 
-      // 3. Buscar figurinhas
       const { data: figs } = await supabase
         .from('figurinhas')
         .select('*')
@@ -163,7 +160,6 @@ export default function App() {
 
       setFigurinhas(figs || []);
 
-      // 4. Buscar ou criar progresso com upsert
       const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
         .upsert({
@@ -194,7 +190,6 @@ export default function App() {
         if (obtidas?.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
       }
 
-      // 5. Buscar questões
       const { data: todasQuestoes, error } = await supabase
         .from('jogo_figurinhas_questoes')
         .select(`id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id`)
@@ -305,7 +300,7 @@ export default function App() {
 
     const dadosResultado = {
       aluno_id: alunoId,
-      jogo_id: ATIVIDADE_ID,
+      jogo_id: ATIVIDADE_ID, // ✅ ID real do jogo
       turma_id: turmaId,
       acertos: acertou ? 1 : 0,
       erros: acertou ? 0 : 1,
@@ -314,18 +309,22 @@ export default function App() {
       habilidade_bncc: questao.habilidade_bncc || 'EF00HI00',
       detalhes_erros: novosErros
     };
-    // ✅ insert simples (sem onConflict)
     await supabase.from('resultados').insert([dadosResultado]);
   };
 
   const salvarResultadoParcial = async (bncc: string) => {
     if (!alunoId || !turmaId || registroResultadoEnviado) return;
     const dadosResultado = {
-      aluno_id: alunoId, jogo_id: ATIVIDADE_ID, turma_id: turmaId,
-      acertos: acertos, erros: erros, tempo_segundos: tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0,
-      total_questoes: acertos + erros, habilidade_bncc: bncc || 'EF00HI00', detalhes_erros: detalhesErrosSession
+      aluno_id: alunoId,
+      jogo_id: ATIVIDADE_ID, // ✅ ID real do jogo
+      turma_id: turmaId,
+      acertos: acertos,
+      erros: erros,
+      tempo_segundos: tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0,
+      total_questoes: acertos + erros,
+      habilidade_bncc: bncc || 'EF00HI00',
+      detalhes_erros: detalhesErrosSession
     };
-    // ✅ insert simples (sem onConflict)
     await supabase.from('resultados').insert([dadosResultado]);
     setRegistroResultadoEnviado(true);
   };
@@ -464,7 +463,6 @@ export default function App() {
   return (
     <div className="album-copa-container">
 
-      {/* MODAL DE CONFIRMAÇÃO (reset) */}
       {mostrarModalReset && (
         <div className="pacote-overlay">
           <div className="pacote-conteudo" style={{ maxWidth: '400px', textAlign: 'center' }}>
