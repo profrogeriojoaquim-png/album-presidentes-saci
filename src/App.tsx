@@ -157,7 +157,6 @@ export default function App() {
         .order('numero', { ascending: true });
       setFigurinhas(figs || []);
 
-      // ✅ LER primeiro, criar só se não existir (corrige o reset)
       const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
         .select('*')
@@ -334,7 +333,6 @@ export default function App() {
       erros_seguidos: 0
     }).eq('aluno_id', alunoId).eq('album_id', albumId);
 
-    // Feedback após reset
     setFeedback({ tipo: 'info', msg: '♻️ Progresso zerado! Você pode recomeçar sua coleção.' });
     setTimeout(() => window.location.reload(), 1500);
   };
@@ -415,7 +413,6 @@ export default function App() {
     }
 
     setProgresso(novoProgresso);
-    // ✅ SEM JSON.stringify – salva como array/object diretamente
     await supabase.from('jogo_figurinhas_progresso').update({
       figurinhas_obtidas: novoProgresso.figurinhas_obtidas,
       figurinhas_repetidas: novoProgresso.figurinhas_repetidas,
@@ -430,19 +427,22 @@ export default function App() {
       await salvarResultadoParcial(questaoAtualObj.habilidade_bncc || 'EF00HI00');
     }
 
-    if (novasFigurinhas.length > 0) {
+    // ✅ Removido o setTimeout para erro – o avanço agora é manual (botão)
+    if (novasFigurinhas.length > 0 && acertou) {
       setTimeout(() => setPacoteAberto(novasFigurinhas), 1500);
       setTimeout(() => {
         setPacoteAberto([]);
         setFeedback(null);
         avancarParaProximaQuestao();
       }, 5000);
-    } else {
+    } else if (acertou) {
+      // Caso de acerto sem novas figurinhas (raro)
       setTimeout(() => {
         setFeedback(null);
         avancarParaProximaQuestao();
-      }, 3500);
+      }, 2000);
     }
+    // ❗ Se errou, NÃO avança automaticamente – o botão "Entendi" no JSX fará isso.
   };
 
   const concluirAtividade = () => {
@@ -531,6 +531,26 @@ export default function App() {
           {alternativaSelecionada && alternativaSelecionada !== questaoAtualObj.resposta_correta && (
             <div className="feedback-pedagogico" style={{ marginTop: '15px', padding: '10px', backgroundColor: '#fef2f2', borderLeft: '4px solid #ef4444', borderRadius: '4px', fontSize: '0.9em' }}>
               <strong>💡 Explicação do erro:</strong> {questaoAtualObj.distratores?.[alternativaSelecionada] || `A alternativa correta é ${questaoAtualObj.resposta_correta}. Revise o conceito abordado no descritor.`}
+              <br />
+              <button
+                onClick={() => {
+                  setFeedback(null);
+                  avancarParaProximaQuestao();
+                }}
+                style={{
+                  marginTop: '10px',
+                  padding: '6px 16px',
+                  backgroundColor: '#3b82f6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '0.85rem'
+                }}
+              >
+                Entendi, próxima questão →
+              </button>
             </div>
           )}
         </div>
@@ -563,6 +583,12 @@ export default function App() {
             {escolaNome && <p><strong>Escola:</strong> {escolaNome}</p>}
           </div>
         </div>
+
+        {/* Mensagem fixa sobre o tooltip */}
+        <div style={{ textAlign: 'center', margin: '12px 0 20px', fontSize: '0.9rem', color: '#6b7280', fontStyle: 'italic' }}>
+          🖱️ Passe o mouse sobre uma figurinha para saber curiosidades sobre ela.
+        </div>
+
         <div className="album-grid">
           {figurinhas.length === 0 ? (
             <div className="col-span-full text-center py-10 text-slate-500">
@@ -573,13 +599,17 @@ export default function App() {
               const obtida = progresso.figurinhas_obtidas.includes(fig.id);
               const rep = progresso.figurinhas_repetidas[fig.id] || 0;
               return (
-                <div key={fig.id} className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}>
+                <div
+                  key={fig.id}
+                  className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}
+                >
                   {obtida ? (
                     <>
                       <img
                         src={fig.imagem_url}
                         alt={fig.nome}
                         crossOrigin="anonymous"
+                        title={fig.curiosidade || fig.nome} // 🖱️ Tooltip nativo
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=${fig.numero}`;
                         }}
@@ -594,6 +624,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Pacote de figurinhas (sem curiosidade) */}
       {pacoteAberto.length > 0 && (
         <div className="pacote-overlay">
           <div className="pacote-conteudo">
@@ -612,12 +643,7 @@ export default function App() {
                       }}
                     />
                     <div className="tag">{fig.raridade === 'repetida' ? '🔄 REPETIDA' : '✨ NOVA!'}</div>
-                    {/* ✅ Exibe curiosidade SEMPRE (nova ou repetida) */}
-                    {fig.curiosidade && (
-                      <div className="curiosidade-texto" style={{ fontSize: '0.8em', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
-                        {fig.curiosidade}
-                      </div>
-                    )}
+                    {/* Curiosidade removida daqui – só no tooltip do grid */}
                   </div>
                 );
               })}
@@ -626,7 +652,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 🔄 Botão recomeçar com nova mensagem */}
+      {/* 🔄 Botão recomeçar */}
       <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '40px' }}>
         <button
           onClick={() => setMostrarModalReset(true)}
