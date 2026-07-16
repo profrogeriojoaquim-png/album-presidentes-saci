@@ -315,7 +315,10 @@ export default function App() {
       habilidade_bncc: questao.habilidade_bncc || 'EF00HI00',
       detalhes_erros: novosErros
     };
-    await supabase.from('resultados').insert([dadosResultado]);
+    await supabase.from('resultados').upsert([dadosResultado], {
+  onConflict: 'aluno_id, jogo_id, turma_id, habilidade_bncc',
+  ignoreDuplicates: false
+});
   };
 
   const salvarResultadoParcial = async (bncc: string) => {
@@ -325,7 +328,12 @@ export default function App() {
       acertos: acertos, erros: erros, tempo_segundos: tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0,
       total_questoes: acertos + erros, habilidade_bncc: bncc || 'EF00HI00', detalhes_erros: detalhesErrosSession
     };
-    const { error } = await supabase.from('resultados').insert([dadosResultado]);
+    const { error } = await supabase
+  .from('resultados')
+  .upsert([dadosResultado], {
+    onConflict: 'aluno_id, jogo_id, turma_id, habilidade_bncc',
+    ignoreDuplicates: false
+  });
     if (error) console.error('Erro ao salvar resultado da atividade:', error);
     setRegistroResultadoEnviado(true);
   };
