@@ -162,7 +162,6 @@ export default function App() {
         .order('numero', { ascending: true });
 
       setFigurinhas(figs || []);
-      console.log('📦 Figurinhas carregadas:', figs);
 
       // 4. Buscar ou criar progresso com upsert
       const { data: progData, error: progError } = await supabase
@@ -289,6 +288,7 @@ export default function App() {
     }
   };
 
+  // ✅ Função salvarResposta corrigida (insert simples)
   const salvarResposta = async (questao: Questao, acertou: boolean, respostaAluno?: string) => {
     if (!alunoId || !turmaId) return;
     const tempoDecorrido = tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0;
@@ -315,12 +315,11 @@ export default function App() {
       habilidade_bncc: questao.habilidade_bncc || 'EF00HI00',
       detalhes_erros: novosErros
     };
-    await supabase.from('resultados').upsert([dadosResultado], {
-  onConflict: 'aluno_id, jogo_id, turma_id, habilidade_bncc',
-  ignoreDuplicates: false
-});
+    // ✅ insert simples (sem onConflict)
+    await supabase.from('resultados').insert([dadosResultado]);
   };
 
+  // ✅ Função salvarResultadoParcial corrigida (insert simples)
   const salvarResultadoParcial = async (bncc: string) => {
     if (!alunoId || !turmaId || registroResultadoEnviado) return;
     const dadosResultado = {
@@ -328,13 +327,8 @@ export default function App() {
       acertos: acertos, erros: erros, tempo_segundos: tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0,
       total_questoes: acertos + erros, habilidade_bncc: bncc || 'EF00HI00', detalhes_erros: detalhesErrosSession
     };
-    const { error } = await supabase
-  .from('resultados')
-  .upsert([dadosResultado], {
-    onConflict: 'aluno_id, jogo_id, turma_id, habilidade_bncc',
-    ignoreDuplicates: false
-  });
-    if (error) console.error('Erro ao salvar resultado da atividade:', error);
+    // ✅ insert simples (sem onConflict)
+    await supabase.from('resultados').insert([dadosResultado]);
     setRegistroResultadoEnviado(true);
   };
 
@@ -569,7 +563,7 @@ export default function App() {
                   {obtida ? (
                     <>
                       <img
-                        src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                        src={fig.imagem_url}
                         alt={fig.nome}
                         crossOrigin="anonymous"
                         onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
@@ -592,7 +586,7 @@ export default function App() {
               {pacoteAberto.map((fig, i) => (
                 <div key={i} className="figurinha-revelada" style={{ animationDelay: `${i * 0.3}s` }}>
                   <img
-                    src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                    src={fig.imagem_url}
                     alt={fig.nome}
                     crossOrigin="anonymous"
                     onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
