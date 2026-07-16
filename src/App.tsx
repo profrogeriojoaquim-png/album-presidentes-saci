@@ -120,6 +120,11 @@ export default function App() {
 
   const albumRef = useRef<HTMLDivElement>(null);
 
+  // Alterar título do navegador
+  useEffect(() => {
+    document.title = '🏛️ Álbum dos Presidentes do Brasil - SACI SABIDO';
+  }, []);
+
   useEffect(() => {
     if (alunoId && turmaId) {
       inicializarAtividade();
@@ -158,19 +163,25 @@ export default function App() {
 
       setFigurinhas(figs || []);
 
-      // 4. Buscar progresso do aluno (usando maybeSingle para evitar erro 406)
+      // 4. Buscar ou criar progresso com upsert
       const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
-        .select('*')
-        .eq('aluno_id', alunoId)
-        .eq('album_id', albumIdFixed)
+        .upsert({
+          aluno_id: alunoId,
+          album_id: albumIdFixed,
+          figurinhas_obtidas: [],
+          figurinhas_repetidas: {},
+          erros_seguidos: 0
+        }, {
+          onConflict: 'aluno_id, album_id',
+          ignoreDuplicates: false
+        })
+        .select()
         .maybeSingle();
 
-      if (progError && progError.code !== 'PGRST116') {
-        console.error('Erro ao buscar progresso:', progError);
-      }
-
-      if (progData) {
+      if (progError) {
+        console.error('Erro ao upsert progresso:', progError);
+      } else if (progData) {
         let obtidas = progData.figurinhas_obtidas;
         if (typeof obtidas === 'string') obtidas = JSON.parse(obtidas);
         let repetidas = progData.figurinhas_repetidas;
@@ -181,21 +192,6 @@ export default function App() {
           erros_seguidos: progData.erros_seguidos || 0
         });
         if (obtidas?.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
-      } else {
-        // Se não existir, insere (não usa upsert para evitar conflitos)
-        const { error: insertError } = await supabase
-          .from('jogo_figurinhas_progresso')
-          .insert({
-            aluno_id: alunoId,
-            album_id: albumIdFixed,
-            figurinhas_obtidas: [],
-            figurinhas_repetidas: {},
-            erros_seguidos: 0
-          });
-
-        if (insertError) {
-          console.error('Erro ao inserir progresso:', insertError);
-        }
       }
 
       // 5. Buscar questões
