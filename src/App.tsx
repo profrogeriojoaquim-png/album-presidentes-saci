@@ -156,15 +156,19 @@ export default function App() {
         .eq('ativo', true)
         .order('numero', { ascending: true });
 
-      if (figs) setFigurinhas(figs);
+      setFigurinhas(figs || []); // se não houver, array vazio
 
-      // 4. Buscar progresso do aluno
-      const { data: progData } = await supabase
+      // 4. Buscar progresso do aluno (usando maybeSingle para evitar erro 406)
+      const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
         .select('*')
         .eq('aluno_id', alunoId)
         .eq('album_id', albumIdFixed)
-        .single();
+        .maybeSingle();
+
+      if (progError && progError.code !== 'PGRST116') {
+        console.error('Erro ao buscar progresso:', progError);
+      }
 
       if (progData) {
         let obtidas = progData.figurinhas_obtidas;
@@ -178,13 +182,20 @@ export default function App() {
         });
         if (obtidas?.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
       } else {
-        await supabase.from('jogo_figurinhas_progresso').insert({
-          aluno_id: alunoId,
-          album_id: albumIdFixed,
-          figurinhas_obtidas: [],
-          figurinhas_repetidas: {},
-          erros_seguidos: 0
-        });
+        // Inserir progresso com upsert para evitar erro 409
+        const { error: insertError } = await supabase
+          .from('jogo_figurinhas_progresso')
+          .upsert({
+            aluno_id: alunoId,
+            album_id: albumIdFixed,
+            figurinhas_obtidas: [],
+            figurinhas_repetidas: {},
+            erros_seguidos: 0
+          }, { onConflict: 'aluno_id, album_id' });
+
+        if (insertError) {
+          console.error('Erro ao inserir progresso:', insertError);
+        }
       }
 
       // 5. Buscar questões
@@ -195,7 +206,14 @@ export default function App() {
         .eq('ativo', true)
         .in('descritor_id', DESCRITORES_IDS);
 
-      if (error || !todasQuestoes || todasQuestoes.length === 0) {
+      if (error) {
+        console.error('Erro ao buscar questões:', error);
+        setFeedback({ tipo: 'erro', msg: 'Erro ao carregar questões. Contate o suporte.' });
+        setLoading(false);
+        return;
+      }
+
+      if (!todasQuestoes || todasQuestoes.length === 0) {
         setFeedback({ tipo: 'erro', msg: 'Nenhuma questão encontrada para esta atividade. Contate o suporte.' });
         setLoading(false);
         return;
@@ -533,25 +551,31 @@ export default function App() {
           </div>
         </div>
         <div className="album-grid">
-          {figurinhas.map(fig => {
-            const obtida = progresso.figurinhas_obtidas.includes(fig.id);
-            const rep = progresso.figurinhas_repetidas[fig.id] || 0;
-            return (
-              <div key={fig.id} className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}>
-                {obtida ? (
-                  <>
-                    <img
-                      src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
-                      alt={fig.nome}
-                      crossOrigin="anonymous"
-                      onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
-                    />
-                    {rep > 0 && <span className="badge-repetida">+{rep}</span>}
-                  </>
-                ) : <span className="numero-vazio">{fig.numero}</span>}
-              </div>
-            );
-          })}
+          {figurinhas.length === 0 ? (
+            <div className="col-span-full text-center py-10 text-slate-500">
+              Nenhuma figurinha cadastrada para este álbum.
+            </div>
+          ) : (
+            figurinhas.map(fig => {
+              const obtida = progresso.figurinhas_obtidas.includes(fig.id);
+              const rep = progresso.figurinhas_repetidas[fig.id] || 0;
+              return (
+                <div key={fig.id} className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}>
+                  {obtida ? (
+                    <>
+                      <img
+                        src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                        alt={fig.nome}
+                        crossOrigin="anonymous"
+                        onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                      />
+                      {rep > 0 && <span className="badge-repetida">+{rep}</span>}
+                    </>
+                  ) : <span className="numero-vazio">{fig.numero}</span>}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
