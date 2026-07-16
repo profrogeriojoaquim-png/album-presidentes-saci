@@ -117,6 +117,7 @@ export default function App() {
 
   const [mostrarModalReset, setMostrarModalReset] = useState(false);
 
+  // Estado para controlar qual figurinha está com a curiosidade aberta
   const [curiosidadeVisivel, setCuriosidadeVisivel] = useState<string | null>(null);
 
   const albumRef = useRef<HTMLDivElement>(null);
@@ -442,6 +443,7 @@ export default function App() {
         avancarParaProximaQuestao();
       }, 2000);
     }
+    // Se errou, NÃO avança automaticamente – o botão "Entendi" no JSX fará isso.
   };
 
   const concluirAtividade = () => {
@@ -459,7 +461,7 @@ export default function App() {
   return (
     <div 
       className="album-copa-container"
-      onClick={() => setCuriosidadeVisivel(null)} // Fecha curiosidade ao clicar fora
+      onClick={() => setCuriosidadeVisivel(null)} // Fecha curiosidade ao clicar fora (mobile)
     >
       {/* MODAL DE CONFIRMAÇÃO - RESET */}
       {mostrarModalReset && (
@@ -576,6 +578,7 @@ export default function App() {
         <div className="progress-bar"><div className="progress-fill" style={{ width: `${percentual}%` }}></div></div>
       </div>
 
+      {/* ===================== ÁREA DO ÁLBUM ===================== */}
       <div ref={albumRef} className="area-para-captura">
         <div className="album-header-captura">
           <h1>🏛️ Álbum dos Presidentes do Brasil - SACI SABIDO</h1>
@@ -590,7 +593,8 @@ export default function App() {
           🖱️ Passe o mouse ou toque em uma figurinha <strong>já obtida</strong> para saber curiosidades sobre ela.
         </div>
 
-        <div className="album-grid">
+        {/* Grid com overflow: visible para não cortar o balão */}
+        <div className="album-grid" style={{ overflow: 'visible' }}>
           {figurinhas.length === 0 ? (
             <div className="col-span-full text-center py-10 text-slate-500">
               Nenhuma figurinha cadastrada para este álbum.
@@ -600,21 +604,23 @@ export default function App() {
               const obtida = progresso.figurinhas_obtidas.includes(fig.id);
               const rep = progresso.figurinhas_repetidas[fig.id] || 0;
               const isVisivel = curiosidadeVisivel === fig.id;
+
               return (
                 <div
                   key={fig.id}
                   className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}
                   style={{
                     position: 'relative',
-                    cursor: 'pointer',
-                    zIndex: isVisivel ? 20 : 1, // Z-index dinâmico
+                    cursor: obtida ? 'pointer' : 'default',
+                    zIndex: isVisivel ? 20 : 1,
+                    overflow: 'visible', // 🔑 NUNCA corta o balão
                   }}
                   onMouseEnter={() => {
                     if (obtida && fig.curiosidade) setCuriosidadeVisivel(fig.id);
                   }}
                   onMouseLeave={() => setCuriosidadeVisivel(null)}
                   onClick={(e) => {
-                    e.stopPropagation(); // Impede que o clique feche a caixa imediatamente
+                    e.stopPropagation(); // Impede que o clique no slot feche a caixa imediatamente
                     if (obtida && fig.curiosidade) {
                       setCuriosidadeVisivel(isVisivel ? null : fig.id);
                     }
@@ -626,6 +632,7 @@ export default function App() {
                         src={fig.imagem_url}
                         alt={fig.nome}
                         crossOrigin="anonymous"
+                        style={{ position: 'relative', zIndex: 1 }}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=${fig.numero}`;
                         }}
@@ -636,36 +643,35 @@ export default function App() {
                     <span className="numero-vazio">{fig.numero}</span>
                   )}
 
-                  {/* Caixa de curiosidade (moderna) - SÓ PARA OBTIDAS */}
+                  {/* Caixa de curiosidade – APENAS para figurinhas OBTIDAS */}
                   {isVisivel && fig.curiosidade && obtida && (
                     <div
                       style={{
                         position: 'absolute',
-                        bottom: 'calc(100% + 8px)',
+                        bottom: 'calc(100% + 12px)',
                         left: '50%',
                         transform: 'translateX(-50%)',
                         backgroundColor: 'white',
                         color: '#1f2937',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
                         fontSize: '0.85rem',
-                        maxWidth: '240px',
+                        maxWidth: '220px',
                         width: 'max-content',
                         textAlign: 'center',
                         zIndex: 30,
-                        pointerEvents: 'none',
                         lineHeight: 1.5,
                         fontWeight: '500',
-                        backdropFilter: 'blur(2px)',
+                        pointerEvents: 'none', // Para não atrapalhar o mouse
                       }}
                     >
                       {fig.curiosidade}
-                      {/* Triângulo indicador com sombra */}
+                      {/* Triângulo indicador */}
                       <div
                         style={{
                           position: 'absolute',
-                          bottom: '-8px',
+                          bottom: '-7px',
                           left: '50%',
                           transform: 'translateX(-50%)',
                           width: 0,
@@ -673,7 +679,7 @@ export default function App() {
                           borderLeft: '8px solid transparent',
                           borderRight: '8px solid transparent',
                           borderTop: '8px solid white',
-                          filter: 'drop-shadow(0 4px 2px rgba(0,0,0,0.05))',
+                          filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.05))',
                         }}
                       />
                     </div>
@@ -684,6 +690,7 @@ export default function App() {
           )}
         </div>
       </div>
+      {/* ===================== FIM DA ÁREA DO ÁLBUM ===================== */}
 
       {/* Pacote de figurinhas (sem curiosidade) */}
       {pacoteAberto.length > 0 && (
