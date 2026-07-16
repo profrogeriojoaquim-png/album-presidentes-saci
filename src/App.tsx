@@ -334,7 +334,8 @@ export default function App() {
       erros_seguidos: 0
     }).eq('aluno_id', alunoId).eq('album_id', albumId);
 
-    setFeedback({ tipo: 'info', msg: 'Progresso reiniciado com sucesso.' });
+    // Feedback após reset
+    setFeedback({ tipo: 'info', msg: '♻️ Progresso zerado! Você pode recomeçar sua coleção.' });
     setTimeout(() => window.location.reload(), 1500);
   };
 
@@ -459,14 +460,30 @@ export default function App() {
   return (
     <div className="album-copa-container">
 
+      {/* MODAL DE CONFIRMAÇÃO - RESET */}
       {mostrarModalReset && (
         <div className="pacote-overlay">
           <div className="pacote-conteudo" style={{ maxWidth: '400px', textAlign: 'center' }}>
-            <h2>⚠️ Atenção</h2>
-            <p>Tem certeza que deseja reiniciar todo o progresso desta atividade? Esta ação não pode ser desfeita.</p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
-              <button onClick={() => setMostrarModalReset(false)} className="btn-concluir" style={{ backgroundColor: '#ccc', color: '#000' }}>Cancelar</button>
-              <button onClick={confirmarReset} className="btn-concluir" style={{ backgroundColor: '#ef4444', color: '#fff' }}>Sim, reiniciar</button>
+            <h2 style={{ fontSize: '1.8rem', marginBottom: '10px' }}>🔄 Recomeçar Álbum</h2>
+            <p style={{ fontSize: '1rem', color: '#555' }}>
+              Tem certeza que deseja recomeçar todo o progresso?<br />
+              Suas figurinhas e estatísticas serão <strong>zeradas</strong>.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
+              <button
+                onClick={() => setMostrarModalReset(false)}
+                className="btn-concluir"
+                style={{ backgroundColor: '#ccc', color: '#000', padding: '12px 24px', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarReset}
+                className="btn-concluir"
+                style={{ backgroundColor: '#ef4444', color: '#fff', padding: '12px 24px', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                Sim, recomeçar
+              </button>
             </div>
           </div>
         </div>
@@ -595,12 +612,8 @@ export default function App() {
                       }}
                     />
                     <div className="tag">{fig.raridade === 'repetida' ? '🔄 REPETIDA' : '✨ NOVA!'}</div>
-                    {ehNova && fig.curiosidade && (
-                      <div className="curiosidade-texto" style={{ fontSize: '0.8em', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
-                        {fig.curiosidade}
-                      </div>
-                    )}
-                    {fig.raridade !== 'repetida' && !ehNova && fig.curiosidade && (
+                    {/* ✅ Exibe curiosidade SEMPRE (nova ou repetida) */}
+                    {fig.curiosidade && (
                       <div className="curiosidade-texto" style={{ fontSize: '0.8em', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
                         {fig.curiosidade}
                       </div>
@@ -613,9 +626,31 @@ export default function App() {
         </div>
       )}
 
+      {/* 🔄 Botão recomeçar com nova mensagem */}
       <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '40px' }}>
-        <button onClick={() => setMostrarModalReset(true)} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.9em' }}>
-          Reiniciar progresso da atividade
+        <button
+          onClick={() => setMostrarModalReset(true)}
+          style={{
+            background: 'none',
+            border: '1px solid #ef4444',
+            color: '#ef4444',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '0.9em',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#ef4444';
+            e.currentTarget.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#ef4444';
+          }}
+        >
+          🔄 Recomeçar Álbum
         </button>
       </div>
     </div>
