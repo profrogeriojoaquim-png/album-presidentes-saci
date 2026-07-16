@@ -162,6 +162,7 @@ export default function App() {
         .order('numero', { ascending: true });
 
       setFigurinhas(figs || []);
+      console.log('📦 Figurinhas carregadas:', figs);
 
       // 4. Buscar ou criar progresso com upsert
       const { data: progData, error: progError } = await supabase
