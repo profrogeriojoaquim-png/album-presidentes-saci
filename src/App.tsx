@@ -46,7 +46,7 @@ interface ErroDetalhado {
 const ATIVIDADE_ID = 'a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7';
 const TOTAL_FIGURINHAS = 45;
 
-// IDs reais dos descritores BNCC para 9º ano de História (cadastrados no Supabase)
+// IDs reais dos descritores BNCC para 9º ano de História
 const DESCRITORES_IDS = [
   '3c803e7a-7538-4266-8e34-59fabdc47cfe', // EF09HI01
   'b11744ff-667b-4052-94b2-d9728323d62c', // EF09HI02
@@ -132,6 +132,7 @@ export default function App() {
   const inicializarAtividade = async () => {
     setLoading(true);
     try {
+      // 1. Buscar dados do aluno
       const { data: alunoData } = await supabase.from('alunos').select('nome_aluno, turma_id').eq('id', alunoId).single();
       if (alunoData) {
         setAlunoNome(alunoData.nome_aluno);
@@ -142,14 +143,39 @@ export default function App() {
         }
       }
 
-      // Busca o álbum por nome contendo "Presidentes" (mais genérico)
-      const { data: albumData } = await supabase.from('albuns').select('id').ilike('nome', '%Presidentes%').single();
-      if (albumData) setAlbumId(albumData.id);
+      // 2. Buscar o álbum (igual ao da Copa, mas com "Presidentes")
+      const { data: albumData, error: albumError } = await supabase
+        .from('albuns')
+        .select('id')
+        .ilike('nome', '%Presidentes%')
+        .single();
 
-      const { data: figs } = await supabase.from('figurinhas').select('*').eq('album_id', albumData?.id).eq('ativo', true).order('numero', { ascending: true });
+      if (albumError || !albumData) {
+        setFeedback({ tipo: 'erro', msg: 'Álbum não encontrado. Contate o suporte.' });
+        setLoading(false);
+        return;
+      }
+
+      setAlbumId(albumData.id);
+
+      // 3. Buscar figurinhas
+      const { data: figs } = await supabase
+        .from('figurinhas')
+        .select('*')
+        .eq('album_id', albumData.id)
+        .eq('ativo', true)
+        .order('numero', { ascending: true });
+
       if (figs) setFigurinhas(figs);
 
-      const { data: progData } = await supabase.from('jogo_figurinhas_progresso').select('*').eq('aluno_id', alunoId).eq('album_id', albumData?.id).single();
+      // 4. Buscar progresso do aluno
+      const { data: progData } = await supabase
+        .from('jogo_figurinhas_progresso')
+        .select('*')
+        .eq('aluno_id', alunoId)
+        .eq('album_id', albumData.id)
+        .single();
+
       if (progData) {
         let obtidas = progData.figurinhas_obtidas;
         if (typeof obtidas === 'string') obtidas = JSON.parse(obtidas);
@@ -162,13 +188,20 @@ export default function App() {
         });
         if (obtidas?.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
       } else {
-        await supabase.from('jogo_figurinhas_progresso').insert({ aluno_id: alunoId, album_id: albumData?.id, figurinhas_obtidas: [], figurinhas_repetidas: {}, erros_seguidos: 0 });
+        await supabase.from('jogo_figurinhas_progresso').insert({
+          aluno_id: alunoId,
+          album_id: albumData.id,
+          figurinhas_obtidas: [],
+          figurinhas_repetidas: {},
+          erros_seguidos: 0
+        });
       }
 
+      // 5. Buscar questões
       const { data: todasQuestoes, error } = await supabase
         .from('jogo_figurinhas_questoes')
         .select(`id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id`)
-        .eq('album_id', albumData?.id)
+        .eq('album_id', albumData.id)
         .eq('ativo', true)
         .in('descritor_id', DESCRITORES_IDS);
 
@@ -185,6 +218,7 @@ export default function App() {
         habilidade_bncc: DESCRITOR_BNCC_MAP[q.descritor_id] || 'EF00HI00'
       }));
 
+      // Embaralhar
       const shuffled = [...questoesComDescritor];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -217,7 +251,7 @@ export default function App() {
       setIndiceAtualQuestao(0);
       setAlternativaSelecionada(null);
       setProcessando(false);
-      setFeedback({ tipo: 'info', msg: '🔄 Você completou todas as questões! Recomeçando a lista de atividades.' });
+      setFeedback({ tipo: 'info', msg: '🔄 Você completou todas as questões! Recomeçando a lista.' });
       setTimeout(() => setFeedback(null), 3000);
     }
   };
