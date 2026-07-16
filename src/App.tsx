@@ -156,7 +156,7 @@ export default function App() {
         .eq('ativo', true)
         .order('numero', { ascending: true });
 
-      setFigurinhas(figs || []); // se não houver, array vazio
+      setFigurinhas(figs || []);
 
       // 4. Buscar progresso do aluno (usando maybeSingle para evitar erro 406)
       const { data: progData, error: progError } = await supabase
@@ -182,16 +182,16 @@ export default function App() {
         });
         if (obtidas?.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
       } else {
-        // Inserir progresso com upsert para evitar erro 409
+        // Se não existir, insere (não usa upsert para evitar conflitos)
         const { error: insertError } = await supabase
           .from('jogo_figurinhas_progresso')
-          .upsert({
+          .insert({
             aluno_id: alunoId,
             album_id: albumIdFixed,
             figurinhas_obtidas: [],
             figurinhas_repetidas: {},
             erros_seguidos: 0
-          }, { onConflict: 'aluno_id, album_id' });
+          });
 
         if (insertError) {
           console.error('Erro ao inserir progresso:', insertError);
