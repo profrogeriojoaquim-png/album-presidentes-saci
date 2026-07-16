@@ -1,5 +1,4 @@
 // src/App.tsx
-
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import './App.css';
@@ -47,33 +46,45 @@ interface ErroDetalhado {
 const ATIVIDADE_ID = 'a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7';
 const TOTAL_FIGURINHAS = 45;
 
-// IDs de descritores de História (substitua pelos IDs reais da tabela 'descritores' do seu banco, se necessário)
+// IDs reais dos descritores BNCC para 9º ano de História (cadastrados no Supabase)
 const DESCRITORES_IDS = [
-  'd1e2f3a4-0ee8-41a6-95a2-0ce06a81db25', 
-  'd2e3f4a5-20ff-43f1-957d-fc3bebe4b6ab',
-  'd3e4f5a6-bcac-43da-b329-ab8d113c7bac', 
-  'd4e5f6a7-c992-41a6-aa49-53f21a4783ec'
+  '3c803e7a-7538-4266-8e34-59fabdc47cfe', // EF09HI01
+  'b11744ff-667b-4052-94b2-d9728323d62c', // EF09HI02
+  '26f30312-680d-467b-8f57-8738f007307b', // EF09HI03
+  'ed9dadcf-a4dd-4986-8a08-78ab97dd9e5f', // EF09HI04
+  '3ab4265a-b4f8-477b-ae01-d401780ba81b', // EF09HI17
+  '034b0fa5-d2d0-40d5-8262-373d44eb5291', // EF09HI19
+  'ec374c8c-5bfc-4a0a-94cc-3765d1941cd4'  // EF09HI20
 ];
 
 const DESCRITOR_COD_MAP: Record<string, string> = {
-  'd1e2f3a4-0ee8-41a6-95a2-0ce06a81db25': 'H01', 
-  'd2e3f4a5-20ff-43f1-957d-fc3bebe4b6ab': 'H02',
-  'd3e4f5a6-bcac-43da-b329-ab8d113c7bac': 'H03', 
-  'd4e5f6a7-c992-41a6-aa49-53f21a4783ec': 'H04'
+  '3c803e7a-7538-4266-8e34-59fabdc47cfe': 'EF09HI01',
+  'b11744ff-667b-4052-94b2-d9728323d62c': 'EF09HI02',
+  '26f30312-680d-467b-8f57-8738f007307b': 'EF09HI03',
+  'ed9dadcf-a4dd-4986-8a08-78ab97dd9e5f': 'EF09HI04',
+  '3ab4265a-b4f8-477b-ae01-d401780ba81b': 'EF09HI17',
+  '034b0fa5-d2d0-40d5-8262-373d44eb5291': 'EF09HI19',
+  'ec374c8c-5bfc-4a0a-94cc-3765d1941cd4': 'EF09HI20'
 };
 
 const DESCRITOR_DESCRICAO_MAP: Record<string, string> = {
-  'd1e2f3a4-0ee8-41a6-95a2-0ce06a81db25': 'Identificar as características dos diferentes períodos da história republicana brasileira.',
-  'd2e3f4a5-20ff-43f1-957d-fc3bebe4b6ab': 'Relacionar os governos presidenciais aos seus respectivos contextos históricos e sociais.',
-  'd3e4f5a6-bcac-43da-b329-ab8d113c7bac': 'Analisar a importância da cidadania e da democracia nos diferentes governos republicanos.',
-  'd4e5f6a7-c992-41a6-aa49-53f21a4783ec': 'Reconhecer as contribuições de diferentes presidentes para a formação do Estado brasileiro.'
+  '3c803e7a-7538-4266-8e34-59fabdc47cfe': 'Descrever e contextualizar os principais aspectos sociais, culturais, econômicos e políticos da emergência da República no Brasil.',
+  'b11744ff-667b-4052-94b2-d9728323d62c': 'Caracterizar e compreender os ciclos da história republicana, identificando particularidades da história local e regional até 1954.',
+  '26f30312-680d-467b-8f57-8738f007307b': 'Identificar os mecanismos de inserção dos negros na sociedade brasileira pós-abolição e avaliar os seus resultados.',
+  'ed9dadcf-a4dd-4986-8a08-78ab97dd9e5f': 'Discutir a importância da participação da população negra na formação econômica, política e social do Brasil.',
+  '3ab4265a-b4f8-477b-ae01-d401780ba81b': 'Identificar e analisar processos sociais, econômicos, culturais e políticos do Brasil a partir de 1946.',
+  '034b0fa5-d2d0-40d5-8262-373d44eb5291': 'Identificar e compreender o processo que resultou na ditadura civil-militar no Brasil e discutir a emergência de questões relacionadas à memória e à justiça sobre os casos de violação dos direitos humanos.',
+  'ec374c8c-5bfc-4a0a-94cc-3765d1941cd4': 'Discutir os processos de resistência e as propostas de reorganização da sociedade brasileira durante a ditadura civil-militar.'
 };
 
 const DESCRITOR_BNCC_MAP: Record<string, string> = {
-  'd1e2f3a4-0ee8-41a6-95a2-0ce06a81db25': 'EF09HI01', 
-  'd2e3f4a5-20ff-43f1-957d-fc3bebe4b6ab': 'EF09HI02',
-  'd3e4f5a6-bcac-43da-b329-ab8d113c7bac': 'EF09HI03', 
-  'd4e5f6a7-c992-41a6-aa49-53f21a4783ec': 'EF09HI04'
+  '3c803e7a-7538-4266-8e34-59fabdc47cfe': 'EF09HI01',
+  'b11744ff-667b-4052-94b2-d9728323d62c': 'EF09HI02',
+  '26f30312-680d-467b-8f57-8738f007307b': 'EF09HI03',
+  'ed9dadcf-a4dd-4986-8a08-78ab97dd9e5f': 'EF09HI04',
+  '3ab4265a-b4f8-477b-ae01-d401780ba81b': 'EF09HI17',
+  '034b0fa5-d2d0-40d5-8262-373d44eb5291': 'EF09HI19',
+  'ec374c8c-5bfc-4a0a-94cc-3765d1941cd4': 'EF09HI20'
 };
 
 export default function App() {
@@ -104,7 +115,6 @@ export default function App() {
   const [tempoInicio, setTempoInicio] = useState<number | null>(null);
   const [registroResultadoEnviado, setRegistroResultadoEnviado] = useState(false);
   
-  // Estado para o modal de confirmação personalizado (substitui window.confirm)
   const [mostrarModalReset, setMostrarModalReset] = useState(false);
 
   const albumRef = useRef<HTMLDivElement>(null);
@@ -132,8 +142,8 @@ export default function App() {
         }
       }
 
-      // Busca o álbum específico dos Presidentes
-      const { data: albumData } = await supabase.from('albuns').select('id').ilike('nome', '%Presidentes do Brasil%').single();
+      // Busca o álbum por nome contendo "Presidentes" (mais genérico)
+      const { data: albumData } = await supabase.from('albuns').select('id').ilike('nome', '%Presidentes%').single();
       if (albumData) setAlbumId(albumData.id);
 
       const { data: figs } = await supabase.from('figurinhas').select('*').eq('album_id', albumData?.id).eq('ativo', true).order('numero', { ascending: true });
@@ -282,7 +292,6 @@ export default function App() {
     setRegistroResultadoEnviado(true);
   };
 
-  // Função acionada pelo modal personalizado, sem usar window.confirm
   const confirmarReset = async () => {
     if (!alunoId || !albumId) return;
     setMostrarModalReset(false);
@@ -417,7 +426,6 @@ export default function App() {
   return (
     <div className="album-copa-container">
       
-      {/* MODAL PERSONALIZADO DE CONFIRMAÇÃO (Substitui window.confirm) */}
       {mostrarModalReset && (
         <div className="pacote-overlay">
           <div className="pacote-conteudo" style={{ maxWidth: '400px', textAlign: 'center' }}>
@@ -470,7 +478,6 @@ export default function App() {
               );
             })}
           </div>
-          {/* Exibição do feedback pedagógico detalhado em caso de erro */}
           {alternativaSelecionada && alternativaSelecionada !== questaoAtualObj.resposta_correta && (
             <div className="feedback-pedagogico" style={{ marginTop: '15px', padding: '10px', backgroundColor: '#fef2f2', borderLeft: '4px solid #ef4444', borderRadius: '4px', fontSize: '0.9em' }}>
               <strong>💡 Explicação do erro:</strong> {questaoAtualObj.distratores?.[alternativaSelecionada] || `A alternativa correta é ${questaoAtualObj.resposta_correta}. Revise o conceito abordado no descritor.`}
@@ -559,5 +566,4 @@ export default function App() {
     </div>
   );
 }
-
 // src/App.tsx
