@@ -43,20 +43,18 @@ interface ErroDetalhado {
   explicacao_erro: string;
 }
 
-// ✅ ID REAL do jogo na tabela `jogos`
 const ATIVIDADE_ID = '80093822-405a-4be4-807e-202888024ee4';
 const TOTAL_FIGURINHAS = 42;
 const ALBUM_ID_FIXO = 'bb84b6cb-7a73-4ca9-8f52-22d8863e6e59';
 
-// IDs reais dos descritores BNCC para 9º ano de História
 const DESCRITORES_IDS = [
-  '3c803e7a-7538-4266-8e34-59fabdc47cfe', // EF09HI01
-  'b11744ff-667b-4052-94b2-d9728323d62c', // EF09HI02
-  '26f30312-680d-467b-8f57-8738f007307b', // EF09HI03
-  'ed9dadcf-a4dd-4986-8a08-78ab97dd9e5f', // EF09HI04
-  '3ab4265a-b4f8-477b-ae01-d401780ba81b', // EF09HI17
-  '034b0fa5-d2d0-40d5-8262-373d44eb5291', // EF09HI19
-  'ec374c8c-5bfc-4a0a-94cc-3765d1941cd4'  // EF09HI20
+  '3c803e7a-7538-4266-8e34-59fabdc47cfe',
+  'b11744ff-667b-4052-94b2-d9728323d62c',
+  '26f30312-680d-467b-8f57-8738f007307b',
+  'ed9dadcf-a4dd-4986-8a08-78ab97dd9e5f',
+  '3ab4265a-b4f8-477b-ae01-d401780ba81b',
+  '034b0fa5-d2d0-40d5-8262-373d44eb5291',
+  'ec374c8c-5bfc-4a0a-94cc-3765d1941cd4'
 ];
 
 const DESCRITOR_COD_MAP: Record<string, string> = {
@@ -157,27 +155,19 @@ export default function App() {
         .eq('album_id', albumIdFixed)
         .eq('ativo', true)
         .order('numero', { ascending: true });
-
       setFigurinhas(figs || []);
 
+      // ✅ LER primeiro, criar só se não existir (corrige o reset)
       const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
-        .upsert({
-          aluno_id: alunoId,
-          album_id: albumIdFixed,
-          figurinhas_obtidas: [],
-          figurinhas_repetidas: {},
-          erros_seguidos: 0
-        }, {
-          onConflict: 'aluno_id, album_id',
-          ignoreDuplicates: false
-        })
-        .select()
+        .select('*')
+        .eq('aluno_id', alunoId)
+        .eq('album_id', albumIdFixed)
         .maybeSingle();
 
-      if (progError) {
-        console.error('Erro ao upsert progresso:', progError);
-      } else if (progData) {
+      if (progError) console.error('Erro ao ler progresso:', progError);
+
+      if (progData) {
         let obtidas = progData.figurinhas_obtidas;
         if (typeof obtidas === 'string') obtidas = JSON.parse(obtidas);
         let repetidas = progData.figurinhas_repetidas;
@@ -187,7 +177,12 @@ export default function App() {
           figurinhas_repetidas: (repetidas && typeof repetidas === 'object') ? repetidas : {},
           erros_seguidos: progData.erros_seguidos || 0
         });
-        if (obtidas?.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
+        if (Array.isArray(obtidas) && obtidas.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
+      } else {
+        const { error: insertError } = await supabase
+          .from('jogo_figurinhas_progresso')
+          .insert({ aluno_id: alunoId, album_id: albumIdFixed, figurinhas_obtidas: [], figurinhas_repetidas: {}, erros_seguidos: 0 });
+        if (insertError) console.error('Erro ao criar progresso:', insertError);
       }
 
       const { data: todasQuestoes, error } = await supabase
@@ -300,7 +295,7 @@ export default function App() {
 
     const dadosResultado = {
       aluno_id: alunoId,
-      jogo_id: ATIVIDADE_ID, // ✅ ID real do jogo
+      jogo_id: ATIVIDADE_ID,
       turma_id: turmaId,
       acertos: acertou ? 1 : 0,
       erros: acertou ? 0 : 1,
@@ -316,7 +311,7 @@ export default function App() {
     if (!alunoId || !turmaId || registroResultadoEnviado) return;
     const dadosResultado = {
       aluno_id: alunoId,
-      jogo_id: ATIVIDADE_ID, // ✅ ID real do jogo
+      jogo_id: ATIVIDADE_ID,
       turma_id: turmaId,
       acertos: acertos,
       erros: erros,
@@ -419,9 +414,10 @@ export default function App() {
     }
 
     setProgresso(novoProgresso);
+    // ✅ SEM JSON.stringify – salva como array/object diretamente
     await supabase.from('jogo_figurinhas_progresso').update({
-      figurinhas_obtidas: JSON.stringify(novoProgresso.figurinhas_obtidas),
-      figurinhas_repetidas: JSON.stringify(novoProgresso.figurinhas_repetidas),
+      figurinhas_obtidas: novoProgresso.figurinhas_obtidas,
+      figurinhas_repetidas: novoProgresso.figurinhas_repetidas,
       erros_seguidos: novoProgresso.erros_seguidos,
       data_ultimo_acesso: new Date().toISOString()
     }).eq('aluno_id', alunoId).eq('album_id', albumId);
