@@ -1,0 +1,650 @@
+/* ============================================
+   ÁLBUM DA COPA SACI SABIDO - ESTILOS COMPLETOS
+   ============================================ */
+
+.album-copa-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #065f46 0%, #10b981 50%, #fbbf24 100%);
+}
+
+/* --- Loading e Erro --- */
+.loading-state, .error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: white;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(255,255,255,0.3);
+  border-top: 6px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* --- Cabeçalho --- */
+.album-header {
+  background: white;
+  border-radius: 24px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  text-align: center;
+}
+
+.album-header h1 {
+  font-size: 24px;
+  color: #065f46;
+  margin: 0 0 15px 0;
+}
+
+.aluno-info {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 10px;
+  background: #f0fdf4;
+  border-radius: 12px;
+}
+
+.aluno-info span {
+  font-size: 14px;
+  color: #065f46;
+  font-weight: 600;
+}
+
+/* --- Questão --- */
+.questao-card {
+  background: white;
+  border-radius: 24px;
+  padding: 25px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.questao-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.descritor-badge {
+  background: #6366f1;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: help;
+}
+
+.descritor-descricao {
+  font-size: 12px;
+  color: #4b5563;
+  background: #f3f4f6;
+  padding: 6px 12px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+}
+
+.dificuldade-badge {
+  font-size: 18px;
+}
+
+.enunciado {
+  font-size: 18px;
+  color: #1e293b;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.alternativas {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alt-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  color: #1e293b;
+  border: 2px solid #e2e8f0;
+  padding: 15px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.alt-btn:hover:not(:disabled) {
+  background: #e0e7ff;
+  border-color: #6366f1;
+  transform: translateX(5px);
+}
+
+.alt-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.alt-btn.correta {
+  background: #d1fae5;
+  border-color: #10b981;
+  color: #065f46;
+  animation: pulse-green 0.5s ease;
+}
+
+.alt-btn.errada {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #991b1b;
+  animation: shake 0.5s ease;
+}
+
+@keyframes pulse-green {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.alt-letra {
+  background: #6366f1;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.alt-btn.correta .alt-letra { background: #10b981; }
+.alt-btn.errada .alt-letra { background: #ef4444; }
+
+/* --- Feedback --- */
+.feedback-msg {
+  padding: 15px 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  font-weight: bold;
+  text-align: center;
+  animation: slideUp 0.3s ease;
+  font-size: 16px;
+}
+
+.feedback-msg.sucesso { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
+.feedback-msg.erro { background: #fee2e2; color: #991b1b; border: 2px solid #ef4444; }
+.feedback-msg.alerta { background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; }
+.feedback-msg.info { background: #dbeafe; color: #1e40af; border: 2px solid #3b82f6; }
+
+/* --- Estatísticas do jogo (fora da captura) --- */
+.album-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  background: white;
+  padding: 12px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #065f46;
+}
+
+.stat-value.alerta {
+  color: #ef4444;
+  animation: pulse-red 1s infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* --- Barra de Progresso --- */
+.progress-container {
+  background: white;
+  padding: 15px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #065f46;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #fbbf24);
+  transition: width 0.5s ease;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+/* --- Área para captura (imagem/PDF) --- */
+.area-para-captura {
+  background-color: #ffffff;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.album-header-captura {
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 10px;
+  background: white;
+  border-radius: 16px;
+}
+
+.album-header-captura h1 {
+  font-size: 24px;
+  color: #065f46;
+  margin: 0 0 10px 0;
+}
+
+.info-captura p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+/* --- Grade do Álbum --- */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0fdf4, #fef3c7);
+  border-radius: 20px;
+  border: 3px solid #fbbf24;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+.figurinha-slot {
+  aspect-ratio: 3/4;
+  background: #e5e7eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #9ca3af;
+  border: 2px dashed #d1d5db;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.figurinha-slot.vazia:hover {
+  background: #f3f4f6;
+  transform: scale(1.05);
+}
+
+.figurinha-slot.obtida {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 2px solid #f59e0b;
+  color: #92400e;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  animation: brilho 0.6s ease;
+}
+
+@keyframes brilho {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); box-shadow: 0 0 20px #fbbf24; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.figurinha-slot.obtida img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #fef3c7;
+  border-radius: 10px;
+}
+
+.numero-vazio { font-size: 16px; }
+
+.badge-repetida {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 2px solid white;
+}
+
+/* --- Modal de Pacote --- */
+.pacote-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pacote-conteudo {
+  background: white;
+  border-radius: 30px;
+  padding: 40px;
+  text-align: center;
+  max-width: 600px;
+  width: 90%;
+  animation: slideUp 0.4s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+.pacote-conteudo h2 {
+  color: #065f46;
+  margin-bottom: 20px;
+  font-size: 28px;
+}
+
+.figurinhas-reveladas {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+
+.figurinha-revelada {
+  width: 120px;
+  height: 160px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-radius: 16px;
+  border: 3px solid #f59e0b;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  animation: flip 0.6s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.figurinha-revelada.repetida {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+}
+
+@keyframes flip {
+  0% { transform: rotateY(180deg) scale(0.5); opacity: 0; }
+  100% { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+
+.figurinha-revelada img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.figurinha-revelada .tag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  font-size: 12px;
+  padding: 6px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* --- Card de conclusão profissional --- */
+.album-completo-card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+  padding: 16px 20px;
+  min-width: 260px;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(6, 95, 70, 0.2);
+  transition: all 0.2s ease;
+}
+
+.album-completo-card .card-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #065f46;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.album-completo-card .card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.album-completo-card button {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 40px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.album-completo-card button:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.96);
+}
+
+.btn-download-img {
+  background: #e0f2fe !important;
+  color: #0369a1 !important;
+}
+.btn-download-pdf {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+.btn-continuar {
+  background: #fef9c3 !important;
+  color: #854d0e !important;
+}
+.btn-fechar {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+/* ============================================
+   CORREÇÕES PARA IMPRESSÃO / PDF
+   ============================================ */
+
+/* Evitar que figurinhas sejam cortadas entre páginas */
+.area-para-captura .figurinha-slot {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.area-para-captura .album-grid {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* Forçar quebras de página apenas entre grupos de figurinhas */
+.area-para-captura .album-grid {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+/* Garantir que imagens não fiquem desbotadas */
+.area-para-captura img {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
+/* Estilos de impressão gerais (ocultar elementos desnecessários) */
+@media print {
+  body {
+    background: white;
+    margin: 0;
+    padding: 0;
+  }
+  .album-copa-container {
+    background: white;
+    padding: 0;
+    margin: 0;
+  }
+  .questao-card, .feedback-msg, button, .pacote-overlay, .album-stats, .progress-container, .pacote-overlay *, .album-completo-card {
+    display: none !important;
+  }
+  .area-para-captura {
+    padding: 0;
+    margin: 0;
+    background: white;
+  }
+  .album-grid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .figurinha-slot {
+    border: 1px solid #ccc;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* --- Responsividade --- */
+@media (max-width: 768px) {
+  .album-copa-container { padding: 10px; }
+  .album-header h1 { font-size: 20px; }
+  .enunciado { font-size: 16px; }
+  .alt-btn { padding: 12px 15px; font-size: 14px; }
+  
+  .album-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 10px;
+  }
+  
+  .figurinha-slot { font-size: 10px; }
+  .numero-vazio { font-size: 12px; }
+  .badge-repetida { width: 18px; height: 18px; font-size: 9px; }
+  .album-stats { grid-template-columns: repeat(2, 1fr); }
+  .figurinha-revelada { width: 90px; height: 120px; }
+  .pacote-conteudo { padding: 20px; }
+  .pacote-conteudo h2 { font-size: 22px; }
+
+  .album-completo-card {
+    bottom: 16px;
+    right: 16px;
+    left: auto;
+    min-width: auto;
+    width: auto;
+    padding: 12px 16px;
+  }
+  .album-completo-card .card-buttons {
+    gap: 8px;
+  }
+  .album-completo-card button {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .album-grid { grid-template-columns: repeat(4, 1fr); }
+  .aluno-info { flex-direction: column; gap: 5px; }
+}
