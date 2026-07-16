@@ -117,6 +117,9 @@ export default function App() {
 
   const [mostrarModalReset, setMostrarModalReset] = useState(false);
 
+  // Novo estado para controlar qual figurinha está com a curiosidade aberta
+  const [curiosidadeVisivel, setCuriosidadeVisivel] = useState<string | null>(null);
+
   const albumRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -427,7 +430,6 @@ export default function App() {
       await salvarResultadoParcial(questaoAtualObj.habilidade_bncc || 'EF00HI00');
     }
 
-    // ✅ Removido o setTimeout para erro – o avanço agora é manual (botão)
     if (novasFigurinhas.length > 0 && acertou) {
       setTimeout(() => setPacoteAberto(novasFigurinhas), 1500);
       setTimeout(() => {
@@ -436,13 +438,12 @@ export default function App() {
         avancarParaProximaQuestao();
       }, 5000);
     } else if (acertou) {
-      // Caso de acerto sem novas figurinhas (raro)
       setTimeout(() => {
         setFeedback(null);
         avancarParaProximaQuestao();
       }, 2000);
     }
-    // ❗ Se errou, NÃO avança automaticamente – o botão "Entendi" no JSX fará isso.
+    // Se errou, NÃO avança automaticamente – o botão "Entendi" no JSX fará isso.
   };
 
   const concluirAtividade = () => {
@@ -584,9 +585,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mensagem fixa sobre o tooltip */}
+        {/* Mensagem fixa sobre a curiosidade */}
         <div style={{ textAlign: 'center', margin: '12px 0 20px', fontSize: '0.9rem', color: '#6b7280', fontStyle: 'italic' }}>
-          🖱️ Passe o mouse sobre uma figurinha para saber curiosidades sobre ela.
+          🖱️ Passe o mouse ou toque em uma figurinha para saber curiosidades sobre ela.
         </div>
 
         <div className="album-grid">
@@ -598,10 +599,20 @@ export default function App() {
             figurinhas.map(fig => {
               const obtida = progresso.figurinhas_obtidas.includes(fig.id);
               const rep = progresso.figurinhas_repetidas[fig.id] || 0;
+              const isVisivel = curiosidadeVisivel === fig.id;
               return (
                 <div
                   key={fig.id}
                   className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}
+                  style={{ position: 'relative', cursor: 'pointer' }}
+                  onMouseEnter={() => { if (fig.curiosidade) setCuriosidadeVisivel(fig.id); }}
+                  onMouseLeave={() => setCuriosidadeVisivel(null)}
+                  onClick={() => {
+                    // Alterna a visibilidade no clique (mobile)
+                    if (fig.curiosidade) {
+                      setCuriosidadeVisivel(isVisivel ? null : fig.id);
+                    }
+                  }}
                 >
                   {obtida ? (
                     <>
@@ -609,14 +620,59 @@ export default function App() {
                         src={fig.imagem_url}
                         alt={fig.nome}
                         crossOrigin="anonymous"
-                        title={fig.curiosidade || fig.nome} // 🖱️ Tooltip nativo
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=${fig.numero}`;
                         }}
                       />
                       {rep > 0 && <span className="badge-repetida">+{rep}</span>}
                     </>
-                  ) : <span className="numero-vazio">{fig.numero}</span>}
+                  ) : (
+                    <span className="numero-vazio">{fig.numero}</span>
+                  )}
+
+                  {/* Caixa de curiosidade (moderna) */}
+                  {isVisivel && fig.curiosidade && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 8px)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: 'white',
+                        color: '#1f2937',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.05)',
+                        fontSize: '0.85rem',
+                        maxWidth: '240px',
+                        width: 'max-content',
+                        textAlign: 'center',
+                        zIndex: 10,
+                        border: '1px solid #e5e7eb',
+                        pointerEvents: 'none',
+                        lineHeight: 1.5,
+                        fontWeight: '500',
+                        backdropFilter: 'blur(2px)',
+                      }}
+                    >
+                      {fig.curiosidade}
+                      {/* Triângulo indicador */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '-8px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 0,
+                          height: 0,
+                          borderLeft: '8px solid transparent',
+                          borderRight: '8px solid transparent',
+                          borderTop: '8px solid white',
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -643,7 +699,6 @@ export default function App() {
                       }}
                     />
                     <div className="tag">{fig.raridade === 'repetida' ? '🔄 REPETIDA' : '✨ NOVA!'}</div>
-                    {/* Curiosidade removida daqui – só no tooltip do grid */}
                   </div>
                 );
               })}
