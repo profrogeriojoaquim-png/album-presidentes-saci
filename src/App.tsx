@@ -3,48 +3,49 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import './App.css';
 
-interface Figurinha { 
-  id: string; 
-  numero: number; 
-  nome: string; 
-  imagem_url: string; 
-  raridade: string; 
-  probabilidade: number; 
+interface Figurinha {
+  id: string;
+  numero: number;
+  nome: string;
+  imagem_url: string;
+  raridade: string;
+  probabilidade: number;
   curiosidade?: string;
 }
 
-interface Questao { 
-  id: string; 
-  enunciado: string; 
-  alternativa_a: string; 
-  alternativa_b: string; 
-  alternativa_c: string; 
-  alternativa_d: string; 
-  resposta_correta: string; 
-  descritor_codigo?: string; 
-  descritor_descricao?: string; 
-  habilidade_bncc?: string; 
-  dificuldade: number; 
-  distratores?: Record<string, string>; 
+interface Questao {
+  id: string;
+  enunciado: string;
+  alternativa_a: string;
+  alternativa_b: string;
+  alternativa_c: string;
+  alternativa_d: string;
+  resposta_correta: string;
+  descritor_codigo?: string;
+  descritor_descricao?: string;
+  habilidade_bncc?: string;
+  dificuldade: number;
+  distratores?: Record<string, string>;
 }
 
-interface Progresso { 
-  figurinhas_obtidas: string[]; 
-  figurinhas_repetidas: Record<string, number>; 
-  erros_seguidos: number; 
+interface Progresso {
+  figurinhas_obtidas: string[];
+  figurinhas_repetidas: Record<string, number>;
+  erros_seguidos: number;
 }
 
-interface ErroDetalhado { 
-  pergunta: string; 
-  questao_id: string; 
-  descritor: string; 
-  resposta_aluno: string; 
-  resposta_correta: string; 
-  explicacao_erro: string; 
+interface ErroDetalhado {
+  pergunta: string;
+  questao_id: string;
+  descritor: string;
+  resposta_aluno: string;
+  resposta_correta: string;
+  explicacao_erro: string;
 }
 
 const ATIVIDADE_ID = 'a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7';
 const TOTAL_FIGURINHAS = 45;
+const ALBUM_ID_FIXO = '80093822-405a-4be4-807e-202888024ee4';
 
 // IDs reais dos descritores BNCC para 9º ano de História
 const DESCRITORES_IDS = [
@@ -95,26 +96,26 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [alunoNome, setAlunoNome] = useState('Aluno');
   const [escolaNome, setEscolaNome] = useState('');
-  const [albumId, setAlbumId] = useState<string>('');
-  
+  const [albumId, setAlbumId] = useState<string>(ALBUM_ID_FIXO);
+
   const [figurinhas, setFigurinhas] = useState<Figurinha[]>([]);
   const [progresso, setProgresso] = useState<Progresso>({ figurinhas_obtidas: [], figurinhas_repetidas: {}, erros_seguidos: 0 });
-  
+
   const [filaQuestoes, setFilaQuestoes] = useState<Questao[]>([]);
   const [indiceAtualQuestao, setIndiceAtualQuestao] = useState(0);
-  
+
   const [alternativaSelecionada, setAlternativaSelecionada] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tipo: 'sucesso' | 'erro' | 'alerta' | 'info'; msg: string } | null>(null);
   const [pacoteAberto, setPacoteAberto] = useState<Figurinha[]>([]);
   const [processando, setProcessando] = useState(false);
   const [albumCompleto, setAlbumCompleto] = useState(false);
-  
+
   const [acertos, setAcertos] = useState(0);
   const [erros, setErros] = useState(0);
   const [detalhesErrosSession, setDetalhesErrosSession] = useState<ErroDetalhado[]>([]);
   const [tempoInicio, setTempoInicio] = useState<number | null>(null);
   const [registroResultadoEnviado, setRegistroResultadoEnviado] = useState(false);
-  
+
   const [mostrarModalReset, setMostrarModalReset] = useState(false);
 
   const albumRef = useRef<HTMLDivElement>(null);
@@ -143,26 +144,15 @@ export default function App() {
         }
       }
 
-      // 2. Buscar o álbum (igual ao da Copa, mas com "Presidentes")
-      const { data: albumData, error: albumError } = await supabase
-        .from('albuns')
-        .select('id')
-        .ilike('nome', '%Presidentes%')
-        .single();
-
-      if (albumError || !albumData) {
-        setFeedback({ tipo: 'erro', msg: 'Álbum não encontrado. Contate o suporte.' });
-        setLoading(false);
-        return;
-      }
-
-      setAlbumId(albumData.id);
+      // 2. Usar o ID fixo do álbum
+      const albumIdFixed = ALBUM_ID_FIXO;
+      setAlbumId(albumIdFixed);
 
       // 3. Buscar figurinhas
       const { data: figs } = await supabase
         .from('figurinhas')
         .select('*')
-        .eq('album_id', albumData.id)
+        .eq('album_id', albumIdFixed)
         .eq('ativo', true)
         .order('numero', { ascending: true });
 
@@ -173,7 +163,7 @@ export default function App() {
         .from('jogo_figurinhas_progresso')
         .select('*')
         .eq('aluno_id', alunoId)
-        .eq('album_id', albumData.id)
+        .eq('album_id', albumIdFixed)
         .single();
 
       if (progData) {
@@ -190,7 +180,7 @@ export default function App() {
       } else {
         await supabase.from('jogo_figurinhas_progresso').insert({
           aluno_id: alunoId,
-          album_id: albumData.id,
+          album_id: albumIdFixed,
           figurinhas_obtidas: [],
           figurinhas_repetidas: {},
           erros_seguidos: 0
@@ -201,7 +191,7 @@ export default function App() {
       const { data: todasQuestoes, error } = await supabase
         .from('jogo_figurinhas_questoes')
         .select(`id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id`)
-        .eq('album_id', albumData.id)
+        .eq('album_id', albumIdFixed)
         .eq('ativo', true)
         .in('descritor_id', DESCRITORES_IDS);
 
@@ -218,7 +208,6 @@ export default function App() {
         habilidade_bncc: DESCRITOR_BNCC_MAP[q.descritor_id] || 'EF00HI00'
       }));
 
-      // Embaralhar
       const shuffled = [...questoesComDescritor];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -260,7 +249,7 @@ export default function App() {
     const comuns = figurinhas.filter(f => f.raridade === 'comum');
     const brilhantes = figurinhas.filter(f => f.raridade === 'brilhante');
     const lendarias = figurinhas.filter(f => f.raridade === 'lendaria');
-    
+
     const rand = Math.random() * 100;
     let raridadeAlvo = 'comum';
     if (rand < 66.7) raridadeAlvo = 'comum';
@@ -271,7 +260,7 @@ export default function App() {
     if (raridadeAlvo === 'comum') disponiveis = comuns.filter(f => !progresso.figurinhas_obtidas.includes(f.id));
     else if (raridadeAlvo === 'brilhante') disponiveis = brilhantes.filter(f => !progresso.figurinhas_obtidas.includes(f.id));
     else disponiveis = lendarias.filter(f => !progresso.figurinhas_obtidas.includes(f.id));
-    
+
     if (garantirNova && disponiveis.length > 0) {
       return disponiveis[Math.floor(Math.random() * disponiveis.length)];
     } else if (disponiveis.length > 0) {
@@ -288,9 +277,9 @@ export default function App() {
   const salvarResposta = async (questao: Questao, acertou: boolean, respostaAluno?: string) => {
     if (!alunoId || !turmaId) return;
     const tempoDecorrido = tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0;
-    
+
     const explicacao = questao.distratores?.[respostaAluno || ''] || `Erro conceitual. A alternativa correta é ${questao.resposta_correta}. Revise o descritor: ${questao.descritor_descricao || ""}`;
-    
+
     const novosErros = acertou ? [] : [{
       pergunta: questao.enunciado,
       questao_id: questao.id,
@@ -299,7 +288,7 @@ export default function App() {
       resposta_correta: questao.resposta_correta,
       explicacao_erro: explicacao
     }];
-    
+
     const dadosResultado = {
       aluno_id: alunoId,
       jogo_id: ATIVIDADE_ID,
@@ -329,13 +318,13 @@ export default function App() {
   const confirmarReset = async () => {
     if (!alunoId || !albumId) return;
     setMostrarModalReset(false);
-    
+
     await supabase.from('jogo_figurinhas_progresso').update({
       figurinhas_obtidas: [],
       figurinhas_repetidas: {},
       erros_seguidos: 0
     }).eq('aluno_id', alunoId).eq('album_id', albumId);
-    
+
     setFeedback({ tipo: 'info', msg: 'Progresso reiniciado com sucesso.' });
     setTimeout(() => window.location.reload(), 1500);
   };
@@ -343,7 +332,7 @@ export default function App() {
   const handleResposta = async (respostaAluno: string) => {
     const questaoAtualObj = filaQuestoes[indiceAtualQuestao];
     if (!questaoAtualObj || !alunoId || !albumId || processando) return;
-    
+
     setProcessando(true);
     setAlternativaSelecionada(respostaAluno);
 
@@ -378,7 +367,7 @@ export default function App() {
     } else {
       setErros(prev => prev + 1);
       const explicacao = questaoAtualObj.distratores?.[respostaAluno] || `Erro conceitual. A alternativa correta é ${questaoAtualObj.resposta_correta}. Revise o descritor: ${questaoAtualObj.descritor_descricao}`;
-      
+
       setDetalhesErrosSession(prev => [...prev, {
         pergunta: questaoAtualObj.enunciado,
         questao_id: questaoAtualObj.id,
@@ -432,15 +421,15 @@ export default function App() {
 
     if (novasFigurinhas.length > 0) {
       setTimeout(() => setPacoteAberto(novasFigurinhas), 1500);
-      setTimeout(() => { 
-        setPacoteAberto([]); 
-        setFeedback(null); 
-        avancarParaProximaQuestao(); 
+      setTimeout(() => {
+        setPacoteAberto([]);
+        setFeedback(null);
+        avancarParaProximaQuestao();
       }, 5000);
     } else {
-      setTimeout(() => { 
-        setFeedback(null); 
-        avancarParaProximaQuestao(); 
+      setTimeout(() => {
+        setFeedback(null);
+        avancarParaProximaQuestao();
       }, 3500);
     }
   };
@@ -459,7 +448,7 @@ export default function App() {
 
   return (
     <div className="album-copa-container">
-      
+
       {mostrarModalReset && (
         <div className="pacote-overlay">
           <div className="pacote-conteudo" style={{ maxWidth: '400px', textAlign: 'center' }}>
@@ -497,7 +486,7 @@ export default function App() {
           )}
           <p className="enunciado">{questaoAtualObj.enunciado}</p>
           <div className="alternativas">
-            {['A','B','C','D'].map(letra => {
+            {['A', 'B', 'C', 'D'].map(letra => {
               const texto = questaoAtualObj[`alternativa_${letra.toLowerCase()}` as keyof Questao] as string;
               let classe = '';
               if (alternativaSelecionada) {
@@ -551,11 +540,11 @@ export default function App() {
               <div key={fig.id} className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}>
                 {obtida ? (
                   <>
-                    <img 
-                      src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`} 
-                      alt={fig.nome} 
+                    <img
+                      src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                      alt={fig.nome}
                       crossOrigin="anonymous"
-                      onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`} 
+                      onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
                     />
                     {rep > 0 && <span className="badge-repetida">+{rep}</span>}
                   </>
@@ -572,12 +561,12 @@ export default function App() {
             <h2>🎉 Você avançou na atividade e ganhou figurinhas!</h2>
             <div className="figurinhas-reveladas">
               {pacoteAberto.map((fig, i) => (
-                <div key={i} className="figurinha-revelada" style={{ animationDelay: `${i*0.3}s` }}>
-                  <img 
-                    src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`} 
-                    alt={fig.nome} 
+                <div key={i} className="figurinha-revelada" style={{ animationDelay: `${i * 0.3}s` }}>
+                  <img
+                    src={fig.imagem_url || `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                    alt={fig.nome}
                     crossOrigin="anonymous"
-                    onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`} 
+                    onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
                   />
                   <div className="tag">{fig.raridade === 'repetida' ? '🔄 REPETIDA' : '✨ NOVA!'}</div>
                   {fig.curiosidade && fig.raridade !== 'repetida' && (
@@ -591,7 +580,7 @@ export default function App() {
           </div>
         </div>
       )}
-      
+
       <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '40px' }}>
         <button onClick={() => setMostrarModalReset(true)} style={{ background: 'none', border: 'none', color: '#ef4444', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.9em' }}>
           Reiniciar progresso da atividade
