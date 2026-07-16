@@ -117,7 +117,6 @@ export default function App() {
 
   const [mostrarModalReset, setMostrarModalReset] = useState(false);
 
-  // Novo estado para controlar qual figurinha está com a curiosidade aberta
   const [curiosidadeVisivel, setCuriosidadeVisivel] = useState<string | null>(null);
 
   const albumRef = useRef<HTMLDivElement>(null);
@@ -443,7 +442,6 @@ export default function App() {
         avancarParaProximaQuestao();
       }, 2000);
     }
-    // Se errou, NÃO avança automaticamente – o botão "Entendi" no JSX fará isso.
   };
 
   const concluirAtividade = () => {
@@ -459,8 +457,10 @@ export default function App() {
   const percentual = TOTAL_FIGURINHAS > 0 ? (progresso.figurinhas_obtidas.length / TOTAL_FIGURINHAS) * 100 : 0;
 
   return (
-    <div className="album-copa-container">
-
+    <div 
+      className="album-copa-container"
+      onClick={() => setCuriosidadeVisivel(null)} // Fecha curiosidade ao clicar fora
+    >
       {/* MODAL DE CONFIRMAÇÃO - RESET */}
       {mostrarModalReset && (
         <div className="pacote-overlay">
@@ -585,9 +585,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mensagem fixa sobre a curiosidade */}
+        {/* Mensagem fixa */}
         <div style={{ textAlign: 'center', margin: '12px 0 20px', fontSize: '0.9rem', color: '#6b7280', fontStyle: 'italic' }}>
-          🖱️ Passe o mouse ou toque em uma figurinha para saber curiosidades sobre ela.
+          🖱️ Passe o mouse ou toque em uma figurinha <strong>já obtida</strong> para saber curiosidades sobre ela.
         </div>
 
         <div className="album-grid">
@@ -604,12 +604,18 @@ export default function App() {
                 <div
                   key={fig.id}
                   className={`figurinha-slot ${obtida ? 'obtida' : 'vazia'}`}
-                  style={{ position: 'relative', cursor: 'pointer' }}
-                  onMouseEnter={() => { if (fig.curiosidade) setCuriosidadeVisivel(fig.id); }}
+                  style={{
+                    position: 'relative',
+                    cursor: 'pointer',
+                    zIndex: isVisivel ? 20 : 1, // Z-index dinâmico
+                  }}
+                  onMouseEnter={() => {
+                    if (obtida && fig.curiosidade) setCuriosidadeVisivel(fig.id);
+                  }}
                   onMouseLeave={() => setCuriosidadeVisivel(null)}
-                  onClick={() => {
-                    // Alterna a visibilidade no clique (mobile)
-                    if (fig.curiosidade) {
+                  onClick={(e) => {
+                    e.stopPropagation(); // Impede que o clique feche a caixa imediatamente
+                    if (obtida && fig.curiosidade) {
                       setCuriosidadeVisivel(isVisivel ? null : fig.id);
                     }
                   }}
@@ -630,8 +636,8 @@ export default function App() {
                     <span className="numero-vazio">{fig.numero}</span>
                   )}
 
-                  {/* Caixa de curiosidade (moderna) */}
-                  {isVisivel && fig.curiosidade && (
+                  {/* Caixa de curiosidade (moderna) - SÓ PARA OBTIDAS */}
+                  {isVisivel && fig.curiosidade && obtida && (
                     <div
                       style={{
                         position: 'absolute',
@@ -642,13 +648,12 @@ export default function App() {
                         color: '#1f2937',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.05)',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
                         fontSize: '0.85rem',
                         maxWidth: '240px',
                         width: 'max-content',
                         textAlign: 'center',
-                        zIndex: 10,
-                        border: '1px solid #e5e7eb',
+                        zIndex: 30,
                         pointerEvents: 'none',
                         lineHeight: 1.5,
                         fontWeight: '500',
@@ -656,7 +661,7 @@ export default function App() {
                       }}
                     >
                       {fig.curiosidade}
-                      {/* Triângulo indicador */}
+                      {/* Triângulo indicador com sombra */}
                       <div
                         style={{
                           position: 'absolute',
@@ -668,7 +673,7 @@ export default function App() {
                           borderLeft: '8px solid transparent',
                           borderRight: '8px solid transparent',
                           borderTop: '8px solid white',
-                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                          filter: 'drop-shadow(0 4px 2px rgba(0,0,0,0.05))',
                         }}
                       />
                     </div>
