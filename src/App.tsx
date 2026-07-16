@@ -45,7 +45,7 @@ interface ErroDetalhado {
 
 const ATIVIDADE_ID = 'a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7';
 const TOTAL_FIGURINHAS = 45;
-const ALBUM_ID_FIXO = '80093822-405a-4be4-807e-202888024ee4';
+const ALBUM_ID_FIXO = 'bb84b6cb-7a73-4ca9-8f52-22d8863e6e59';
 
 // IDs reais dos descritores BNCC para 9º ano de História
 const DESCRITORES_IDS = [
