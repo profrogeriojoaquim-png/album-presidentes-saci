@@ -44,7 +44,7 @@ interface ErroDetalhado {
 }
 
 const ATIVIDADE_ID = 'a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7';
-const TOTAL_FIGURINHAS = 45;
+const TOTAL_FIGURINHAS = 42; // Atualizado para 42 (inclui as 3 da Junta Militar)
 const ALBUM_ID_FIXO = 'bb84b6cb-7a73-4ca9-8f52-22d8863e6e59';
 
 // IDs reais dos descritores BNCC para 9º ano de História
@@ -288,7 +288,6 @@ export default function App() {
     }
   };
 
-  // ✅ Função salvarResposta corrigida (insert simples)
   const salvarResposta = async (questao: Questao, acertou: boolean, respostaAluno?: string) => {
     if (!alunoId || !turmaId) return;
     const tempoDecorrido = tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0;
@@ -319,7 +318,6 @@ export default function App() {
     await supabase.from('resultados').insert([dadosResultado]);
   };
 
-  // ✅ Função salvarResultadoParcial corrigida (insert simples)
   const salvarResultadoParcial = async (bncc: string) => {
     if (!alunoId || !turmaId || registroResultadoEnviado) return;
     const dadosResultado = {
@@ -359,7 +357,7 @@ export default function App() {
 
     if (acertou) {
       setAcertos(prev => prev + 1);
-      setFeedback({ tipo: 'sucesso', msg: `🎉 Resposta correta! Você avançou na atividade e ganhou 2 figurinhas.` });
+      setFeedback({ tipo: 'sucesso', msg: '🎉 Resposta correta! Você ganhou 2 figurinhas!' });
       novoProgresso.erros_seguidos = 0;
 
       const totalFaltando = TOTAL_FIGURINHAS - novoProgresso.figurinhas_obtidas.length;
@@ -401,7 +399,7 @@ export default function App() {
         const novasRepetidas = { ...novoProgresso.figurinhas_repetidas };
         if (novaQtd === 0) delete novasRepetidas[idRep]; else novasRepetidas[idRep] = novaQtd;
         novoProgresso.figurinhas_repetidas = novasRepetidas;
-        setFeedback({ tipo: 'alerta', msg: `🛡️ Resposta incorreta. Você usou uma figurinha repetida como escudo de proteção.` });
+        setFeedback({ tipo: 'alerta', msg: '🛡️ Resposta incorreta. Usou uma figurinha repetida como escudo!' });
         novoProgresso.erros_seguidos = 0;
       } else {
         novoProgresso.erros_seguidos += 1;
@@ -410,13 +408,13 @@ export default function App() {
             const novasObtidas = [...novoProgresso.figurinhas_obtidas];
             novasObtidas.pop();
             novoProgresso.figurinhas_obtidas = novasObtidas;
-            setFeedback({ tipo: 'erro', msg: `⚠️ 3 erros seguidos. Você perdeu uma figurinha. Revise o conteúdo com atenção.` });
+            setFeedback({ tipo: 'erro', msg: '⚠️ 3 erros seguidos! Você perdeu uma figurinha.' });
           } else {
-            setFeedback({ tipo: 'erro', msg: `❌ Resposta incorreta. Revise o conteúdo e o descritor da habilidade.` });
+            setFeedback({ tipo: 'erro', msg: '❌ Resposta incorreta. Revise o conteúdo.' });
           }
           novoProgresso.erros_seguidos = 0;
         } else {
-          setFeedback({ tipo: 'erro', msg: `❌ Resposta incorreta. Erro ${novoProgresso.erros_seguidos}/3. Leia a explicação do erro.` });
+          setFeedback({ tipo: 'erro', msg: `❌ Errado. ${novoProgresso.erros_seguidos}/3. Leia a explicação abaixo.` });
         }
       }
     }
@@ -466,6 +464,7 @@ export default function App() {
   return (
     <div className="album-copa-container">
 
+      {/* MODAL DE CONFIRMAÇÃO (reset) */}
       {mostrarModalReset && (
         <div className="pacote-overlay">
           <div className="pacote-conteudo" style={{ maxWidth: '400px', textAlign: 'center' }}>
@@ -526,7 +525,11 @@ export default function App() {
         </div>
       )}
 
-      {feedback && pacoteAberto.length === 0 && <div className={`feedback-msg ${feedback.tipo}`}>{feedback.msg}</div>}
+      {feedback && pacoteAberto.length === 0 && (
+        <div className={`feedback-msg ${feedback.tipo}`}>
+          {feedback.msg}
+        </div>
+      )}
 
       <div className="album-stats">
         <div className="stat-item"><div className="stat-label">Acertos</div><div className="stat-value">{acertos}</div></div>
@@ -566,7 +569,9 @@ export default function App() {
                         src={fig.imagem_url}
                         alt={fig.nome}
                         crossOrigin="anonymous"
-                        onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=${fig.numero}`;
+                        }}
                       />
                       {rep > 0 && <span className="badge-repetida">+{rep}</span>}
                     </>
@@ -583,22 +588,32 @@ export default function App() {
           <div className="pacote-conteudo">
             <h2>🎉 Você avançou na atividade e ganhou figurinhas!</h2>
             <div className="figurinhas-reveladas">
-              {pacoteAberto.map((fig, i) => (
-                <div key={i} className="figurinha-revelada" style={{ animationDelay: `${i * 0.3}s` }}>
-                  <img
-                    src={fig.imagem_url}
-                    alt={fig.nome}
-                    crossOrigin="anonymous"
-                    onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=Fig+${fig.numero}`}
-                  />
-                  <div className="tag">{fig.raridade === 'repetida' ? '🔄 REPETIDA' : '✨ NOVA!'}</div>
-                  {fig.curiosidade && fig.raridade !== 'repetida' && (
-                    <div className="curiosidade-texto" style={{ fontSize: '0.8em', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
-                      "{fig.curiosidade.substring(0, 80)}..."
-                    </div>
-                  )}
-                </div>
-              ))}
+              {pacoteAberto.map((fig, i) => {
+                const ehNova = !progresso.figurinhas_obtidas.includes(fig.id);
+                return (
+                  <div key={i} className="figurinha-revelada" style={{ animationDelay: `${i * 0.3}s` }}>
+                    <img
+                      src={fig.imagem_url}
+                      alt={fig.nome}
+                      crossOrigin="anonymous"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://placehold.co/100x130/fde68a/92400e?text=${fig.numero}`;
+                      }}
+                    />
+                    <div className="tag">{fig.raridade === 'repetida' ? '🔄 REPETIDA' : '✨ NOVA!'}</div>
+                    {ehNova && fig.curiosidade && (
+                      <div className="curiosidade-texto" style={{ fontSize: '0.8em', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
+                        {fig.curiosidade}
+                      </div>
+                    )}
+                    {fig.raridade !== 'repetida' && !ehNova && fig.curiosidade && (
+                      <div className="curiosidade-texto" style={{ fontSize: '0.8em', marginTop: '5px', color: '#555', fontStyle: 'italic' }}>
+                        {fig.curiosidade}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
