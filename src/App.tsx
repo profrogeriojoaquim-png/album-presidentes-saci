@@ -236,7 +236,6 @@ export default function App() {
       }
 
       if (!todasQuestoes || todasQuestoes.length === 0) {
-        // Se todas as questões já foram respondidas, pode recomeçar ou mostrar mensagem
         setFeedback({ tipo: 'info', msg: '🎉 Você já respondeu todas as questões disponíveis! Parabéns!' });
         setLoading(false);
         return;
@@ -274,7 +273,6 @@ export default function App() {
       setAlternativaSelecionada(null);
       setProcessando(false);
     } else {
-      // Se acabou a fila, recomeça com as questões restantes (não respondidas ainda)
       const novaFila = [...filaQuestoes];
       for (let i = novaFila.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -291,7 +289,6 @@ export default function App() {
 
   // Função de sorteio melhorada (com exclusão de IDs)
   const sortearFigurinhaComGarantia = (garantirNova: boolean, excluirIds: string[] = []): Figurinha => {
-    // Filtra as figurinhas já excluindo os IDs que não podem ser sorteados
     const comuns = figurinhas.filter(f => f.raridade === 'comum' && !excluirIds.includes(f.id));
     const brilhantes = figurinhas.filter(f => f.raridade === 'brilhante' && !excluirIds.includes(f.id));
     const lendarias = figurinhas.filter(f => f.raridade === 'lendaria' && !excluirIds.includes(f.id));
@@ -312,14 +309,12 @@ export default function App() {
     } else if (disponiveis.length > 0) {
       return disponiveis[Math.floor(Math.random() * disponiveis.length)];
     } else {
-      // Se não houver disponíveis, busca todas (permitindo repetidas)
       let todas: Figurinha[] = [];
       if (raridadeAlvo === 'comum') todas = comuns;
       else if (raridadeAlvo === 'brilhante') todas = brilhantes;
       else todas = lendarias;
 
       if (todas.length === 0) {
-        // Caso extremo: usa qualquer uma do geral
         const todasGeral = figurinhas.filter(f => f.raridade === raridadeAlvo);
         return { ...todasGeral[Math.floor(Math.random() * todasGeral.length)], raridade: 'repetida' };
       }
@@ -406,9 +401,7 @@ export default function App() {
 
       const totalFaltando = TOTAL_FIGURINHAS - novoProgresso.figurinhas_obtidas.length;
       
-      // Sorteia a primeira (não exclui ninguém)
       const primeira = sortearFigurinhaComGarantia(totalFaltando > 0, []);
-      // Sorteia a segunda EXCLUINDO a primeira para nunca serem iguais
       const segunda = sortearFigurinhaComGarantia(false, [primeira.id]);
       
       novasFigurinhas = [primeira, segunda];
@@ -475,7 +468,6 @@ export default function App() {
       questoes_respondidas: novasRespondidas
     });
 
-    // Salvar no banco (incluindo questoes_respondidas)
     await supabase.from('jogo_figurinhas_progresso').update({
       figurinhas_obtidas: novoProgresso.figurinhas_obtidas,
       figurinhas_repetidas: novoProgresso.figurinhas_repetidas,
@@ -491,7 +483,6 @@ export default function App() {
       await salvarResultadoParcial(questaoAtualObj.habilidade_bncc || 'EF00HI00');
     }
 
-    // Gerenciar o fluxo pós-resposta
     if (novasFigurinhas.length > 0 && acertou) {
       setTimeout(() => setPacoteAberto(novasFigurinhas), 1500);
       setTimeout(() => {
