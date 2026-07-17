@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from './supabase';
 import './App.css';
 
@@ -96,7 +96,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [alunoNome, setAlunoNome] = useState('Aluno');
   const [escolaNome, setEscolaNome] = useState('');
-  const [albumId, setAlbumId] = useState<string>(ALBUM_ID_FIXO);
+  const [albumId] = useState<string>(ALBUM_ID_FIXO);
 
   const [figurinhas, setFigurinhas] = useState<Figurinha[]>([]);
   const [progresso, setProgresso] = useState<Progresso>({
@@ -125,6 +125,146 @@ export default function App() {
 
   const albumRef = useRef<HTMLDivElement>(null);
 
+  // ============================================================
+  // ✅ FIX 1: Ref para acessar progresso atual em callbacks
+  // ============================================================
+  const progressoRef = useRef<Progresso>(progresso);
+  useEffect(() => {
+    progressoRef.current = progresso;
+  }, [progresso]);
+
+  // ============================================================
+  // ✅ FIX 2: Função robusta de salvamento com UPSERT e retry
+  // ============================================================
+  const salvarProgressoNoBanco = useCallback(async (dadosProgresso: Progresso) => {
+    if (!alunoId || !albumId) {
+      console.error('salvarProgressoNoBanco: alunoId ou albumId ausente');
+      return false;
+    }
+
+    const payload = {
+      aluno_id: alunoId,
+      album_id: albumId,
+      figurinhas_obtidas: dadosProgresso.figurinhas_obtidas,
+      figurinhas_repetidas: dadosProgresso.figurinhas_repetidas,
+      erros_seguidos: dadosProgresso.erros_seguidos,
+      questoes_respondidas: dadosProgresso.questoes_respondidas,
+      data_ultimo_acesso: new Date().toISOString()
+    };
+
+    // TENTATIVA 1: UPSERT (insert se não existe, update se existe)
+    const { error: upsertError } = await supabase
+      .from('jogo_figurinhas_progresso')
+      .upsert(payload, {
+        onConflict: 'aluno_id,album_id'
+      });
+
+    if (!upsertError) {
+      console.log('✅ Progresso salvo com sucesso (upsert)');
+      return true;
+    }
+
+    console.error('❌ Erro no upsert do progresso:', upsertError);
+
+    // TENTATIVA 2: UPDATE direto
+    const { error: updateError } = await supabase
+      .from('jogo_figurinhas_progresso')
+      .update({
+        figurinhas_obtidas: dadosProgresso.figurinhas_obtidas,
+        figurinhas_repetidas: dadosProgresso.figurinhas_repetidas,
+        erros_seguidos: dadosProgresso.erros_seguidos,
+        questoes_respondidas: dadosProgresso.questoes_respondidas,
+        data_ultimo_acesso: new Date().toISOString()
+      })
+      .eq('aluno_id', alunoId)
+      .eq('album_id', albumId);
+
+    if (!updateError) {
+      console.log('✅ Progresso salvo com sucesso (update fallback)');
+      return true;
+    }
+
+    console.error('❌ Erro no update do progresso:', updateError);
+
+    // TENTATIVA 3: INSERT (se a linha realmente não existe)
+    const { error: insertError } = await supabase
+      .from('jogo_figurinhas_progresso')
+      .insert(payload);
+
+    if (!insertError) {
+      console.log('✅ Progresso salvo com sucesso (insert fallback)');
+      return true;
+    }
+
+    console.error('❌ Erro no insert do progresso:', insertError);
+    return false;
+  }, [alunoId, albumId]);
+
+  // ============================================================
+  // ✅ FIX 3: beforeunload - salva antes de sair da página
+  // ============================================================
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const prog = progressoRef.current;
+      if (prog && alunoId && albumId && prog.questoes_respondidas.length > 0) {
+        // navigator.sendBeacon não funciona com Supabase (precisa de headers),
+        // mas usamos synchronous fetch como fallback
+        const payload = {
+          aluno_id: alunoId,
+          album_id: albumId,
+          figurinhas_obtidas: prog.figurinhas_obtidas,
+          figurinhas_repetidas: prog.figurinhas_repetidas,
+          erros_seguidos: prog.erros_seguidos,
+          questoes_respondidas: prog.questoes_respondidas,
+          data_ultimo_acesso: new Date().toISOString()
+        };
+
+        try {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 
+                              (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || '';
+          const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 
+                              (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || '';
+          
+          if (supabaseUrl && supabaseKey) {
+            // Fetch síncrono para garantir salvamento antes da aba fechar
+            const xhr = new XMLHttpRequest();
+            xhr.open('PATCH', 
+              `${supabaseUrl}/rest/v1/jogo_figurinhas_progresso?aluno_id=eq.${alunoId}&album_id=eq.${albumId}`,
+              false // synchronous!
+            );
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('apikey', supabaseKey);
+            xhr.setRequestHeader('Authorization', `Bearer ${supabaseKey}`);
+            xhr.setRequestHeader('Prefer', 'resolution=merge-duplicates');
+            xhr.send(JSON.stringify(payload));
+          }
+        } catch (err) {
+          console.warn('Não foi possível salvar sincronamente no beforeunload:', err);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [alunoId, albumId]);
+
+  // ============================================================
+  // ✅ FIX 4: visibilitychange - salva quando a aba perde foco
+  // ============================================================
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        const prog = progressoRef.current;
+        if (prog && alunoId && albumId && prog.questoes_respondidas.length > 0) {
+          salvarProgressoNoBanco(prog);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [alunoId, albumId, salvarProgressoNoBanco]);
+
   useEffect(() => {
     document.title = '🏛️ Álbum dos Presidentes do Brasil - SACI SABIDO';
   }, []);
@@ -143,26 +283,40 @@ export default function App() {
     setLoading(true);
     try {
       // 1. Buscar dados do aluno
-      const { data: alunoData } = await supabase.from('alunos').select('nome_aluno, turma_id').eq('id', alunoId).single();
+      const { data: alunoData, error: alunoError } = await supabase
+        .from('alunos')
+        .select('nome_aluno, turma_id')
+        .eq('id', alunoId)
+        .single();
+
+      if (alunoError) console.error('Erro ao buscar aluno:', alunoError);
+
       if (alunoData) {
         setAlunoNome(alunoData.nome_aluno);
-        const { data: turmaData } = await supabase.from('turmas').select('escola_id').eq('id', turmaId).single();
+        const { data: turmaData } = await supabase
+          .from('turmas')
+          .select('escola_id')
+          .eq('id', turmaId)
+          .single();
         if (turmaData) {
-          const { data: escolaData } = await supabase.from('escolas').select('nome').eq('id', turmaData.escola_id).single();
+          const { data: escolaData } = await supabase
+            .from('escolas')
+            .select('nome')
+            .eq('id', turmaData.escola_id)
+            .single();
           if (escolaData) setEscolaNome(escolaData.nome);
         }
       }
 
-      const albumIdFixed = ALBUM_ID_FIXO;
-      setAlbumId(albumIdFixed);
-
       // 2. Buscar figurinhas
-      const { data: figs } = await supabase
+      const { data: figs, error: figsError } = await supabase
         .from('figurinhas')
         .select('*')
-        .eq('album_id', albumIdFixed)
+        .eq('album_id', ALBUM_ID_FIXO)
         .eq('ativo', true)
         .order('numero', { ascending: true });
+
+      if (figsError) console.error('Erro ao buscar figurinhas:', figsError);
       setFigurinhas(figs || []);
 
       // 3. Buscar progresso
@@ -170,60 +324,95 @@ export default function App() {
         .from('jogo_figurinhas_progresso')
         .select('*')
         .eq('aluno_id', alunoId)
-        .eq('album_id', albumIdFixed)
+        .eq('album_id', ALBUM_ID_FIXO)
         .maybeSingle();
 
       let questoesRespondidasIds: string[] = [];
 
-      if (progError) console.error('Erro ao ler progresso:', progError);
+      if (progError) {
+        console.error('❌ Erro ao ler progresso:', progError);
+        // Se erro de RLS, mostrar aviso
+        if (progError.code === '42501' || progError.message?.includes('policy')) {
+          setFeedback({ tipo: 'erro', msg: '⚠️ Erro de permissão no banco de dados. Contate o suporte.' });
+        }
+      }
 
       if (progData) {
         let obtidas = progData.figurinhas_obtidas;
-        if (typeof obtidas === 'string') obtidas = JSON.parse(obtidas);
+        if (typeof obtidas === 'string') {
+          try { obtidas = JSON.parse(obtidas); } catch { obtidas = []; }
+        }
         let repetidas = progData.figurinhas_repetidas;
-        if (typeof repetidas === 'string') repetidas = JSON.parse(repetidas);
+        if (typeof repetidas === 'string') {
+          try { repetidas = JSON.parse(repetidas); } catch { repetidas = {}; }
+        }
         let respondidas = progData.questoes_respondidas || [];
-        if (typeof respondidas === 'string') respondidas = JSON.parse(respondidas);
+        if (typeof respondidas === 'string') {
+          try { respondidas = JSON.parse(respondidas); } catch { respondidas = []; }
+        }
         questoesRespondidasIds = Array.isArray(respondidas) ? respondidas : [];
 
-        setProgresso({
+        const progressoCarregado: Progresso = {
           figurinhas_obtidas: Array.isArray(obtidas) ? obtidas : [],
           figurinhas_repetidas: (repetidas && typeof repetidas === 'object') ? repetidas : {},
           erros_seguidos: progData.erros_seguidos || 0,
           questoes_respondidas: questoesRespondidasIds
-        });
-        if (Array.isArray(obtidas) && obtidas.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
+        };
+
+        setProgresso(progressoCarregado);
+
+        if (Array.isArray(obtidas) && obtidas.length === TOTAL_FIGURINHAS) {
+          setAlbumCompleto(true);
+        }
+
+        console.log(`📊 Progresso carregado: ${obtidas?.length || 0} figurinhas, ${questoesRespondidasIds.length} questões respondidas`);
       } else {
+        // Criar registro de progresso
+        const novoProgressoVazio = {
+          aluno_id: alunoId,
+          album_id: ALBUM_ID_FIXO,
+          figurinhas_obtidas: [],
+          figurinhas_repetidas: {},
+          erros_seguidos: 0,
+          questoes_respondidas: []
+        };
+
         const { error: insertError } = await supabase
           .from('jogo_figurinhas_progresso')
-          .insert({
-            aluno_id: alunoId,
-            album_id: albumIdFixed,
-            figurinhas_obtidas: [],
-            figurinhas_repetidas: {},
-            erros_seguidos: 0,
-            questoes_respondidas: []
-          });
-        if (insertError) console.error('Erro ao criar progresso:', insertError);
+          .upsert(novoProgressoVazio, { onConflict: 'aluno_id,album_id' });
+
+        if (insertError) {
+          console.error('❌ Erro ao criar progresso:', insertError);
+          // Tenta insert simples como fallback
+          const { error: insertError2 } = await supabase
+            .from('jogo_figurinhas_progresso')
+            .insert(novoProgressoVazio);
+          if (insertError2) {
+            console.error('❌ Erro no insert fallback:', insertError2);
+            setFeedback({ tipo: 'erro', msg: '⚠️ Não foi possível inicializar seu progresso. Contate o suporte.' });
+          }
+        } else {
+          console.log('✅ Progresso criado com sucesso');
+        }
       }
 
       // 4. Buscar questões filtrando as já respondidas
       let query = supabase
         .from('jogo_figurinhas_questoes')
-        .select(`id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id`)
-        .eq('album_id', albumIdFixed)
+        .select('id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id')
+        .eq('album_id', ALBUM_ID_FIXO)
         .eq('ativo', true)
         .in('descritor_id', DESCRITORES_IDS);
 
       if (questoesRespondidasIds.length > 0) {
-        const filterIds = `(${questoesRespondidasIds.join(',')})`;
-        query = query.not('id', 'in', filterIds);
+        // ✅ FIX: Formato correto do filtro NOT IN para UUIDs
+        query = query.not('id', 'in', `(${questoesRespondidasIds.map(id => `"${id}"`).join(',')})`);
       }
 
-      const { data: todasQuestoes, error } = await query;
+      const { data: todasQuestoes, error: questoesError } = await query;
 
-      if (error) {
-        console.error('Erro ao buscar questões:', error);
+      if (questoesError) {
+        console.error('❌ Erro ao buscar questões:', questoesError);
         setFeedback({ tipo: 'erro', msg: 'Erro ao carregar questões. Contate o suporte.' });
         setLoading(false);
         return;
@@ -242,6 +431,7 @@ export default function App() {
         habilidade_bncc: DESCRITOR_BNCC_MAP[q.descritor_id] || 'EF00HI00'
       }));
 
+      // Shuffle (Fisher-Yates)
       const shuffled = [...questoesComDescritor];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -252,7 +442,7 @@ export default function App() {
       setProcessando(false);
 
     } catch (error) {
-      console.error("Erro ao inicializar atividade:", error);
+      console.error("❌ Erro ao inicializar atividade:", error);
       setFeedback({ tipo: 'erro', msg: 'Erro ao carregar dados da atividade. Tente novamente.' });
     } finally {
       setLoading(false);
@@ -279,7 +469,14 @@ export default function App() {
     }
   };
 
-  const sortearFigurinhaComGarantia = (garantirNova: boolean, excluirIds: string[] = []): Figurinha => {
+  // ============================================================
+  // ✅ FIX 5: sortearFigurinha agora recebe o progresso ATUAL
+  // ============================================================
+  const sortearFigurinhaComGarantia = (
+    garantirNova: boolean, 
+    excluirIds: string[] = [],
+    progressoAtual: Progresso  // ← AGORA RECEBE O PROGRESSO ATUAL
+  ): Figurinha => {
     const comuns = figurinhas.filter(f => f.raridade === 'comum' && !excluirIds.includes(f.id));
     const brilhantes = figurinhas.filter(f => f.raridade === 'brilhante' && !excluirIds.includes(f.id));
     const lendarias = figurinhas.filter(f => f.raridade === 'lendaria' && !excluirIds.includes(f.id));
@@ -291,9 +488,9 @@ export default function App() {
     else raridadeAlvo = 'lendaria';
 
     let disponiveis: Figurinha[] = [];
-    if (raridadeAlvo === 'comum') disponiveis = comuns.filter(f => !progresso.figurinhas_obtidas.includes(f.id));
-    else if (raridadeAlvo === 'brilhante') disponiveis = brilhantes.filter(f => !progresso.figurinhas_obtidas.includes(f.id));
-    else disponiveis = lendarias.filter(f => !progresso.figurinhas_obtidas.includes(f.id));
+    if (raridadeAlvo === 'comum') disponiveis = comuns.filter(f => !progressoAtual.figurinhas_obtidas.includes(f.id));
+    else if (raridadeAlvo === 'brilhante') disponiveis = brilhantes.filter(f => !progressoAtual.figurinhas_obtidas.includes(f.id));
+    else disponiveis = lendarias.filter(f => !progressoAtual.figurinhas_obtidas.includes(f.id));
 
     if (garantirNova && disponiveis.length > 0) {
       return disponiveis[Math.floor(Math.random() * disponiveis.length)];
@@ -317,7 +514,8 @@ export default function App() {
     if (!alunoId || !turmaId) return;
     const tempoDecorrido = tempoInicio ? Math.floor((Date.now() - tempoInicio) / 1000) : 0;
 
-    const explicacao = questao.distratores?.[respostaAluno || ''] || `Erro conceitual. A alternativa correta é ${questao.resposta_correta}. Revise o descritor: ${questao.descritor_descricao || ""}`;
+    const explicacao = questao.distratores?.[respostaAluno || ''] || 
+      `Erro conceitual. A alternativa correta é ${questao.resposta_correta}. Revise o descritor: ${questao.descritor_descricao || ""}`;
 
     const novosErros = acertou ? [] : [{
       pergunta: questao.enunciado,
@@ -339,7 +537,11 @@ export default function App() {
       habilidade_bncc: questao.habilidade_bncc || 'EF00HI00',
       detalhes_erros: novosErros
     };
-    await supabase.from('resultados').insert([dadosResultado]);
+
+    const { error: resultadoError } = await supabase.from('resultados').insert([dadosResultado]);
+    if (resultadoError) {
+      console.error('❌ Erro ao salvar resultado:', resultadoError);
+    }
   };
 
   const salvarResultadoParcial = async (bncc: string) => {
@@ -355,10 +557,18 @@ export default function App() {
       habilidade_bncc: bncc || 'EF00HI00',
       detalhes_erros: detalhesErrosSession
     };
-    await supabase.from('resultados').insert([dadosResultado]);
-    setRegistroResultadoEnviado(true);
+    
+    const { error } = await supabase.from('resultados').insert([dadosResultado]);
+    if (error) {
+      console.error('❌ Erro ao salvar resultado parcial:', error);
+    } else {
+      setRegistroResultadoEnviado(true);
+    }
   };
 
+  // ============================================================
+  // ✅ FIX PRINCIPAL: handleResposta com salvamento robusto
+  // ============================================================
   const handleResposta = async (respostaAluno: string) => {
     const questaoAtualObj = filaQuestoes[indiceAtualQuestao];
     if (!questaoAtualObj || !alunoId || !albumId || processando) return;
@@ -376,27 +586,39 @@ export default function App() {
       novoProgresso.erros_seguidos = 0;
 
       const totalFaltando = TOTAL_FIGURINHAS - novoProgresso.figurinhas_obtidas.length;
-      const primeira = sortearFigurinhaComGarantia(totalFaltando > 0, []);
-      const segunda = sortearFigurinhaComGarantia(false, [primeira.id]);
-      novasFigurinhas = [primeira, segunda];
 
+      // ✅ FIX: Passar novoProgresso para o sorteio usar dados atualizados
+      const primeira = sortearFigurinhaComGarantia(totalFaltando > 0, [], novoProgresso);
+      
+      // Atualizar progresso com a primeira figurinha ANTES de sortear a segunda
       if (primeira.raridade !== 'repetida' && !novoProgresso.figurinhas_obtidas.includes(primeira.id)) {
         novoProgresso.figurinhas_obtidas = [...novoProgresso.figurinhas_obtidas, primeira.id];
       } else {
         const idFig = primeira.id;
-        novoProgresso.figurinhas_repetidas = { ...novoProgresso.figurinhas_repetidas, [idFig]: (novoProgresso.figurinhas_repetidas[idFig] || 0) + 1 };
+        novoProgresso.figurinhas_repetidas = { 
+          ...novoProgresso.figurinhas_repetidas, 
+          [idFig]: (novoProgresso.figurinhas_repetidas[idFig] || 0) + 1 
+        };
       }
+
+      // ✅ Agora sortear a segunda com o progresso já atualizado
+      const segunda = sortearFigurinhaComGarantia(false, [primeira.id], novoProgresso);
+      novasFigurinhas = [primeira, segunda];
 
       if (segunda.raridade !== 'repetida' && !novoProgresso.figurinhas_obtidas.includes(segunda.id)) {
         novoProgresso.figurinhas_obtidas = [...novoProgresso.figurinhas_obtidas, segunda.id];
       } else {
         const idFig = segunda.id;
-        novoProgresso.figurinhas_repetidas = { ...novoProgresso.figurinhas_repetidas, [idFig]: (novoProgresso.figurinhas_repetidas[idFig] || 0) + 1 };
+        novoProgresso.figurinhas_repetidas = { 
+          ...novoProgresso.figurinhas_repetidas, 
+          [idFig]: (novoProgresso.figurinhas_repetidas[idFig] || 0) + 1 
+        };
       }
 
     } else {
       setErros(prev => prev + 1);
-      const explicacao = questaoAtualObj.distratores?.[respostaAluno] || `Erro conceitual. A alternativa correta é ${questaoAtualObj.resposta_correta}. Revise o descritor: ${questaoAtualObj.descritor_descricao}`;
+      const explicacao = questaoAtualObj.distratores?.[respostaAluno] || 
+        `Erro conceitual. A alternativa correta é ${questaoAtualObj.resposta_correta}. Revise o descritor: ${questaoAtualObj.descritor_descricao}`;
 
       setDetalhesErrosSession(prev => [...prev, {
         pergunta: questaoAtualObj.enunciado,
@@ -407,12 +629,16 @@ export default function App() {
         explicacao_erro: explicacao
       }]);
 
-      const totalRepetidas = Object.values(novoProgresso.figurinhas_repetidas).reduce((s, q) => s + (typeof q === 'number' ? q : 0), 0);
+      const totalRepetidas = Object.values(novoProgresso.figurinhas_repetidas)
+        .reduce((s, q) => s + (typeof q === 'number' ? q : 0), 0);
+        
       if (totalRepetidas > 0) {
-        const idRep = Object.keys(novoProgresso.figurinhas_repetidas).find(id => novoProgresso.figurinhas_repetidas[id] > 0)!;
+        const idRep = Object.keys(novoProgresso.figurinhas_repetidas)
+          .find(id => novoProgresso.figurinhas_repetidas[id] > 0)!;
         const novaQtd = novoProgresso.figurinhas_repetidas[idRep] - 1;
         const novasRepetidas = { ...novoProgresso.figurinhas_repetidas };
-        if (novaQtd === 0) delete novasRepetidas[idRep]; else novasRepetidas[idRep] = novaQtd;
+        if (novaQtd === 0) delete novasRepetidas[idRep]; 
+        else novasRepetidas[idRep] = novaQtd;
         novoProgresso.figurinhas_repetidas = novasRepetidas;
         setFeedback({ tipo: 'alerta', msg: '🛡️ Resposta incorreta. Usou uma figurinha repetida como escudo!' });
         novoProgresso.erros_seguidos = 0;
@@ -434,27 +660,43 @@ export default function App() {
       }
     }
 
+    // Adicionar questão às respondidas
     const novasRespondidas = [...(novoProgresso.questoes_respondidas || []), questaoAtualObj.id];
-    setProgresso({
+    
+    const progressoFinal: Progresso = {
       ...novoProgresso,
       questoes_respondidas: novasRespondidas
-    });
+    };
 
-    await supabase.from('jogo_figurinhas_progresso').update({
-      figurinhas_obtidas: novoProgresso.figurinhas_obtidas,
-      figurinhas_repetidas: novoProgresso.figurinhas_repetidas,
-      erros_seguidos: novoProgresso.erros_seguidos,
-      data_ultimo_acesso: new Date().toISOString(),
-      questoes_respondidas: novasRespondidas
-    }).eq('aluno_id', alunoId).eq('album_id', albumId);
+    // ✅ Atualizar state React
+    setProgresso(progressoFinal);
 
+    // ✅ FIX PRINCIPAL: Salvar no banco com UPSERT + verificação de erro
+    const salvou = await salvarProgressoNoBanco(progressoFinal);
+
+    if (!salvou) {
+      console.error('🔴 FALHA CRÍTICA: Progresso não foi salvo no banco!');
+      // Tenta novamente após 1 segundo
+      setTimeout(async () => {
+        console.log('🔄 Retentando salvar progresso...');
+        const retryResult = await salvarProgressoNoBanco(progressoFinal);
+        if (!retryResult) {
+          console.error('🔴 Segunda tentativa também falhou!');
+          setFeedback(prev => prev ? { ...prev, msg: prev.msg + ' ⚠️ Erro ao salvar progresso!' } : null);
+        }
+      }, 1000);
+    }
+
+    // ✅ Salvar resposta individual
     await salvarResposta(questaoAtualObj, acertou, respostaAluno);
 
+    // Verificar álbum completo
     if (novoProgresso.figurinhas_obtidas.length === TOTAL_FIGURINHAS && !albumCompleto) {
       setAlbumCompleto(true);
       await salvarResultadoParcial(questaoAtualObj.habilidade_bncc || 'EF00HI00');
     }
 
+    // Avançar para próxima questão
     if (novasFigurinhas.length > 0 && acertou) {
       setTimeout(() => setPacoteAberto(novasFigurinhas), 1500);
       setTimeout(() => {
@@ -471,10 +713,19 @@ export default function App() {
   };
 
   const concluirAtividade = () => {
+    // ✅ Salvar progresso antes de fechar
+    if (alunoId && albumId) {
+      salvarProgressoNoBanco(progressoRef.current);
+    }
     window.close();
   };
 
-  if (loading) return <div className="loading-state"><div className="loading-spinner"></div><p>Carregando atividade...</p></div>;
+  if (loading) return (
+    <div className="loading-state">
+      <div className="loading-spinner"></div>
+      <p>Carregando atividade...</p>
+    </div>
+  );
 
   const questaoAtualObj = filaQuestoes[indiceAtualQuestao];
   const totalRepetidas = progresso.figurinhas_repetidas && typeof progresso.figurinhas_repetidas === 'object'
@@ -519,7 +770,12 @@ export default function App() {
                 else if (letra === alternativaSelecionada) classe = 'errada';
               }
               return (
-                <button key={letra} className={`alt-btn ${classe}`} onClick={() => handleResposta(letra)} disabled={!!alternativaSelecionada}>
+                <button 
+                  key={letra} 
+                  className={`alt-btn ${classe}`} 
+                  onClick={() => handleResposta(letra)} 
+                  disabled={!!alternativaSelecionada}
+                >
                   <span className="alt-letra">{letra}</span>
                   <span className="alt-texto">{texto}</span>
                 </button>
@@ -709,4 +965,3 @@ export default function App() {
     </div>
   );
 }
-// src/App.tsx
