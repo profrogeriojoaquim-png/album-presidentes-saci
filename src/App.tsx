@@ -32,6 +32,7 @@ interface Progresso {
   figurinhas_obtidas: string[];
   figurinhas_repetidas: Record<string, number>;
   erros_seguidos: number;
+  questoes_respondidas?: string[]; // novo
 }
 
 interface ErroDetalhado {
@@ -47,6 +48,7 @@ const ATIVIDADE_ID = '80093822-405a-4be4-807e-202888024ee4';
 const TOTAL_FIGURINHAS = 42;
 const ALBUM_ID_FIXO = 'bb84b6cb-7a73-4ca9-8f52-22d8863e6e59';
 
+// IDs reais dos descritores BNCC para 9º ano de História
 const DESCRITORES_IDS = [
   '3c803e7a-7538-4266-8e34-59fabdc47cfe',
   'b11744ff-667b-4052-94b2-d9728323d62c',
@@ -98,7 +100,12 @@ export default function App() {
   const [albumId, setAlbumId] = useState<string>(ALBUM_ID_FIXO);
 
   const [figurinhas, setFigurinhas] = useState<Figurinha[]>([]);
-  const [progresso, setProgresso] = useState<Progresso>({ figurinhas_obtidas: [], figurinhas_repetidas: {}, erros_seguidos: 0 });
+  const [progresso, setProgresso] = useState<Progresso>({ 
+    figurinhas_obtidas: [], 
+    figurinhas_repetidas: {}, 
+    erros_seguidos: 0,
+    questoes_respondidas: [] 
+  });
 
   const [filaQuestoes, setFilaQuestoes] = useState<Questao[]>([]);
   const [indiceAtualQuestao, setIndiceAtualQuestao] = useState(0);
@@ -117,7 +124,6 @@ export default function App() {
 
   const [mostrarModalReset, setMostrarModalReset] = useState(false);
 
-  // Estado para controlar qual figurinha está com a curiosidade aberta
   const [curiosidadeVisivel, setCuriosidadeVisivel] = useState<string | null>(null);
 
   const albumRef = useRef<HTMLDivElement>(null);
@@ -139,6 +145,7 @@ export default function App() {
   const inicializarAtividade = async () => {
     setLoading(true);
     try {
+      // 1. Buscar dados do aluno
       const { data: alunoData } = await supabase.from('alunos').select('nome_aluno, turma_id').eq('id', alunoId).single();
       if (alunoData) {
         setAlunoNome(alunoData.nome_aluno);
@@ -152,6 +159,7 @@ export default function App() {
       const albumIdFixed = ALBUM_ID_FIXO;
       setAlbumId(albumIdFixed);
 
+      // 2. Buscar figurinhas
       const { data: figs } = await supabase
         .from('figurinhas')
         .select('*')
@@ -160,12 +168,15 @@ export default function App() {
         .order('numero', { ascending: true });
       setFigurinhas(figs || []);
 
+      // 3. Buscar progresso (inclui questoes_respondidas)
       const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
         .select('*')
         .eq('aluno_id', alunoId)
         .eq('album_id', albumIdFixed)
         .maybeSingle();
+
+      let questoesRespondidasIds: string[] = [];
 
       if (progError) console.error('Erro ao ler progresso:', progError);
 
@@ -174,25 +185,48 @@ export default function App() {
         if (typeof obtidas === 'string') obtidas = JSON.parse(obtidas);
         let repetidas = progData.figurinhas_repetidas;
         if (typeof repetidas === 'string') repetidas = JSON.parse(repetidas);
+        let respondidas = progData.questoes_respondidas || [];
+        if (typeof respondidas === 'string') respondidas = JSON.parse(respondidas);
+        questoesRespondidasIds = Array.isArray(respondidas) ? respondidas : [];
+
         setProgresso({
           figurinhas_obtidas: Array.isArray(obtidas) ? obtidas : [],
           figurinhas_repetidas: (repetidas && typeof repetidas === 'object') ? repetidas : {},
-          erros_seguidos: progData.erros_seguidos || 0
+          erros_seguidos: progData.erros_seguidos || 0,
+          questoes_respondidas: questoesRespondidasIds
         });
         if (Array.isArray(obtidas) && obtidas.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
       } else {
+        // Se não existir progresso, cria um novo
         const { error: insertError } = await supabase
           .from('jogo_figurinhas_progresso')
-          .insert({ aluno_id: alunoId, album_id: albumIdFixed, figurinhas_obtidas: [], figurinhas_repetidas: {}, erros_seguidos: 0 });
+          .insert({ 
+            aluno_id: alunoId, 
+            album_id: albumIdFixed, 
+            figurinhas_obtidas: [], 
+            figurinhas_repetidas: {}, 
+            erros_seguidos: 0,
+            questoes_respondidas: []
+          });
         if (insertError) console.error('Erro ao criar progresso:', insertError);
       }
 
-      const { data: todasQuestoes, error } = await supabase
+      // 4. Buscar questões filtrando as que já foram respondidas
+      const filterIds = questoesRespondidasIds.length > 0 ? `(${questoesRespondidasIds.join(',')})` : '()';
+      
+      // Se não houver questões respondidas, buscar todas
+      let query = supabase
         .from('jogo_figurinhas_questoes')
         .select(`id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id`)
         .eq('album_id', albumIdFixed)
         .eq('ativo', true)
         .in('descritor_id', DESCRITORES_IDS);
+
+      if (questoesRespondidasIds.length > 0) {
+        query = query.not('id', 'in', filterIds);
+      }
+
+      const { data: todasQuestoes, error } = await query;
 
       if (error) {
         console.error('Erro ao buscar questões:', error);
@@ -202,7 +236,8 @@ export default function App() {
       }
 
       if (!todasQuestoes || todasQuestoes.length === 0) {
-        setFeedback({ tipo: 'erro', msg: 'Nenhuma questão encontrada para esta atividade. Contate o suporte.' });
+        // Se todas as questões já foram respondidas, pode recomeçar ou mostrar mensagem
+        setFeedback({ tipo: 'info', msg: '🎉 Você já respondeu todas as questões disponíveis! Parabéns!' });
         setLoading(false);
         return;
       }
@@ -214,6 +249,7 @@ export default function App() {
         habilidade_bncc: DESCRITOR_BNCC_MAP[q.descritor_id] || 'EF00HI00'
       }));
 
+      // Embaralhar
       const shuffled = [...questoesComDescritor];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -231,12 +267,14 @@ export default function App() {
     }
   };
 
+  // Função para avançar para a próxima questão (usada em acertos e no botão "Entendi")
   const avancarParaProximaQuestao = () => {
     if (indiceAtualQuestao + 1 < filaQuestoes.length) {
       setIndiceAtualQuestao(prev => prev + 1);
       setAlternativaSelecionada(null);
       setProcessando(false);
     } else {
+      // Se acabou a fila, recomeça com as questões restantes (não respondidas ainda)
       const novaFila = [...filaQuestoes];
       for (let i = novaFila.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -251,10 +289,12 @@ export default function App() {
     }
   };
 
-  const sortearFigurinhaComGarantia = (garantirNova: boolean): Figurinha => {
-    const comuns = figurinhas.filter(f => f.raridade === 'comum');
-    const brilhantes = figurinhas.filter(f => f.raridade === 'brilhante');
-    const lendarias = figurinhas.filter(f => f.raridade === 'lendaria');
+  // Função de sorteio melhorada (com exclusão de IDs)
+  const sortearFigurinhaComGarantia = (garantirNova: boolean, excluirIds: string[] = []): Figurinha => {
+    // Filtra as figurinhas já excluindo os IDs que não podem ser sorteados
+    const comuns = figurinhas.filter(f => f.raridade === 'comum' && !excluirIds.includes(f.id));
+    const brilhantes = figurinhas.filter(f => f.raridade === 'brilhante' && !excluirIds.includes(f.id));
+    const lendarias = figurinhas.filter(f => f.raridade === 'lendaria' && !excluirIds.includes(f.id));
 
     const rand = Math.random() * 100;
     let raridadeAlvo = 'comum';
@@ -272,10 +312,17 @@ export default function App() {
     } else if (disponiveis.length > 0) {
       return disponiveis[Math.floor(Math.random() * disponiveis.length)];
     } else {
+      // Se não houver disponíveis, busca todas (permitindo repetidas)
       let todas: Figurinha[] = [];
       if (raridadeAlvo === 'comum') todas = comuns;
       else if (raridadeAlvo === 'brilhante') todas = brilhantes;
       else todas = lendarias;
+
+      if (todas.length === 0) {
+        // Caso extremo: usa qualquer uma do geral
+        const todasGeral = figurinhas.filter(f => f.raridade === raridadeAlvo);
+        return { ...todasGeral[Math.floor(Math.random() * todasGeral.length)], raridade: 'repetida' };
+      }
       return { ...todas[Math.floor(Math.random() * todas.length)], raridade: 'repetida' };
     }
   };
@@ -333,7 +380,8 @@ export default function App() {
     await supabase.from('jogo_figurinhas_progresso').update({
       figurinhas_obtidas: [],
       figurinhas_repetidas: {},
-      erros_seguidos: 0
+      erros_seguidos: 0,
+      questoes_respondidas: []
     }).eq('aluno_id', alunoId).eq('album_id', albumId);
 
     setFeedback({ tipo: 'info', msg: '♻️ Progresso zerado! Você pode recomeçar sua coleção.' });
@@ -357,8 +405,12 @@ export default function App() {
       novoProgresso.erros_seguidos = 0;
 
       const totalFaltando = TOTAL_FIGURINHAS - novoProgresso.figurinhas_obtidas.length;
-      const primeira = sortearFigurinhaComGarantia(totalFaltando > 0);
-      const segunda = sortearFigurinhaComGarantia(false);
+      
+      // Sorteia a primeira (não exclui ninguém)
+      const primeira = sortearFigurinhaComGarantia(totalFaltando > 0, []);
+      // Sorteia a segunda EXCLUINDO a primeira para nunca serem iguais
+      const segunda = sortearFigurinhaComGarantia(false, [primeira.id]);
+      
       novasFigurinhas = [primeira, segunda];
 
       if (primeira.raridade !== 'repetida' && !novoProgresso.figurinhas_obtidas.includes(primeira.id)) {
@@ -415,12 +467,21 @@ export default function App() {
       }
     }
 
-    setProgresso(novoProgresso);
+    // Marcar a questão como respondida
+    const novasRespondidas = [...(novoProgresso.questoes_respondidas || []), questaoAtualObj.id];
+
+    setProgresso({
+      ...novoProgresso,
+      questoes_respondidas: novasRespondidas
+    });
+
+    // Salvar no banco (incluindo questoes_respondidas)
     await supabase.from('jogo_figurinhas_progresso').update({
       figurinhas_obtidas: novoProgresso.figurinhas_obtidas,
       figurinhas_repetidas: novoProgresso.figurinhas_repetidas,
       erros_seguidos: novoProgresso.erros_seguidos,
-      data_ultimo_acesso: new Date().toISOString()
+      data_ultimo_acesso: new Date().toISOString(),
+      questoes_respondidas: novasRespondidas
     }).eq('aluno_id', alunoId).eq('album_id', albumId);
 
     await salvarResposta(questaoAtualObj, acertou, respostaAluno);
@@ -430,6 +491,7 @@ export default function App() {
       await salvarResultadoParcial(questaoAtualObj.habilidade_bncc || 'EF00HI00');
     }
 
+    // Gerenciar o fluxo pós-resposta
     if (novasFigurinhas.length > 0 && acertou) {
       setTimeout(() => setPacoteAberto(novasFigurinhas), 1500);
       setTimeout(() => {
@@ -443,7 +505,7 @@ export default function App() {
         avancarParaProximaQuestao();
       }, 2000);
     }
-    // Se errou, NÃO avança automaticamente – o botão "Entendi" no JSX fará isso.
+    // Se errou, o botão "Entendi" no JSX avança manualmente
   };
 
   const concluirAtividade = () => {
@@ -461,7 +523,7 @@ export default function App() {
   return (
     <div 
       className="album-copa-container"
-      onClick={() => setCuriosidadeVisivel(null)} // Fecha curiosidade ao clicar fora (mobile)
+      onClick={() => setCuriosidadeVisivel(null)}
     >
       {/* MODAL DE CONFIRMAÇÃO - RESET */}
       {mostrarModalReset && (
@@ -578,7 +640,6 @@ export default function App() {
         <div className="progress-bar"><div className="progress-fill" style={{ width: `${percentual}%` }}></div></div>
       </div>
 
-      {/* ===================== ÁREA DO ÁLBUM ===================== */}
       <div ref={albumRef} className="area-para-captura">
         <div className="album-header-captura">
           <h1>🏛️ Álbum dos Presidentes do Brasil - SACI SABIDO</h1>
@@ -588,12 +649,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mensagem fixa */}
         <div style={{ textAlign: 'center', margin: '12px 0 20px', fontSize: '0.9rem', color: '#6b7280', fontStyle: 'italic' }}>
           🖱️ Passe o mouse ou toque em uma figurinha <strong>já obtida</strong> para saber curiosidades sobre ela.
         </div>
 
-        {/* Grid com overflow: visible para não cortar o balão */}
         <div className="album-grid" style={{ overflow: 'visible' }}>
           {figurinhas.length === 0 ? (
             <div className="col-span-full text-center py-10 text-slate-500">
@@ -613,14 +672,14 @@ export default function App() {
                     position: 'relative',
                     cursor: obtida ? 'pointer' : 'default',
                     zIndex: isVisivel ? 20 : 1,
-                    overflow: 'visible', // 🔑 NUNCA corta o balão
+                    overflow: 'visible',
                   }}
                   onMouseEnter={() => {
                     if (obtida && fig.curiosidade) setCuriosidadeVisivel(fig.id);
                   }}
                   onMouseLeave={() => setCuriosidadeVisivel(null)}
                   onClick={(e) => {
-                    e.stopPropagation(); // Impede que o clique no slot feche a caixa imediatamente
+                    e.stopPropagation();
                     if (obtida && fig.curiosidade) {
                       setCuriosidadeVisivel(isVisivel ? null : fig.id);
                     }
@@ -643,7 +702,6 @@ export default function App() {
                     <span className="numero-vazio">{fig.numero}</span>
                   )}
 
-                  {/* Caixa de curiosidade – APENAS para figurinhas OBTIDAS */}
                   {isVisivel && fig.curiosidade && obtida && (
                     <div
                       style={{
@@ -663,11 +721,10 @@ export default function App() {
                         zIndex: 30,
                         lineHeight: 1.5,
                         fontWeight: '500',
-                        pointerEvents: 'none', // Para não atrapalhar o mouse
+                        pointerEvents: 'none',
                       }}
                     >
                       {fig.curiosidade}
-                      {/* Triângulo indicador */}
                       <div
                         style={{
                           position: 'absolute',
@@ -690,7 +747,6 @@ export default function App() {
           )}
         </div>
       </div>
-      {/* ===================== FIM DA ÁREA DO ÁLBUM ===================== */}
 
       {/* Pacote de figurinhas (sem curiosidade) */}
       {pacoteAberto.length > 0 && (
@@ -719,7 +775,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 🔄 Botão recomeçar */}
+      {/* Botão recomeçar */}
       <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '40px' }}>
         <button
           onClick={() => setMostrarModalReset(true)}
