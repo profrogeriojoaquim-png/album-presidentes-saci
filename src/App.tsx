@@ -32,7 +32,7 @@ interface Progresso {
   figurinhas_obtidas: string[];
   figurinhas_repetidas: Record<string, number>;
   erros_seguidos: number;
-  questoes_respondidas?: string[];
+  questoes_respondidas: string[];
 }
 
 interface ErroDetalhado {
@@ -121,8 +121,6 @@ export default function App() {
   const [tempoInicio, setTempoInicio] = useState<number | null>(null);
   const [registroResultadoEnviado, setRegistroResultadoEnviado] = useState(false);
 
-  const [mostrarModalReset, setMostrarModalReset] = useState(false);
-
   const [curiosidadeVisivel, setCuriosidadeVisivel] = useState<string | null>(null);
 
   const albumRef = useRef<HTMLDivElement>(null);
@@ -167,7 +165,7 @@ export default function App() {
         .order('numero', { ascending: true });
       setFigurinhas(figs || []);
 
-      // 3. Buscar progresso (inclui questoes_respondidas)
+      // 3. Buscar progresso
       const { data: progData, error: progError } = await supabase
         .from('jogo_figurinhas_progresso')
         .select('*')
@@ -196,7 +194,6 @@ export default function App() {
         });
         if (Array.isArray(obtidas) && obtidas.length === TOTAL_FIGURINHAS) setAlbumCompleto(true);
       } else {
-        // Se não existir progresso, cria um novo
         const { error: insertError } = await supabase
           .from('jogo_figurinhas_progresso')
           .insert({
@@ -210,7 +207,7 @@ export default function App() {
         if (insertError) console.error('Erro ao criar progresso:', insertError);
       }
 
-      // 4. Buscar questões filtrando as que já foram respondidas
+      // 4. Buscar questões filtrando as já respondidas
       let query = supabase
         .from('jogo_figurinhas_questoes')
         .select(`id, enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta, dificuldade, distratores, descritor_id`)
@@ -362,21 +359,6 @@ export default function App() {
     setRegistroResultadoEnviado(true);
   };
 
-  const confirmarReset = async () => {
-    if (!alunoId || !albumId) return;
-    setMostrarModalReset(false);
-
-    await supabase.from('jogo_figurinhas_progresso').update({
-      figurinhas_obtidas: [],
-      figurinhas_repetidas: {},
-      erros_seguidos: 0,
-      questoes_respondidas: []
-    }).eq('aluno_id', alunoId).eq('album_id', albumId);
-
-    setFeedback({ tipo: 'info', msg: '♻️ Progresso zerado! Você pode recomeçar sua coleção.' });
-    setTimeout(() => window.location.reload(), 1500);
-  };
-
   const handleResposta = async (respostaAluno: string) => {
     const questaoAtualObj = filaQuestoes[indiceAtualQuestao];
     if (!questaoAtualObj || !alunoId || !albumId || processando) return;
@@ -453,7 +435,6 @@ export default function App() {
     }
 
     const novasRespondidas = [...(novoProgresso.questoes_respondidas || []), questaoAtualObj.id];
-
     setProgresso({
       ...novoProgresso,
       questoes_respondidas: novasRespondidas
@@ -506,34 +487,6 @@ export default function App() {
       className="album-copa-container"
       onClick={() => setCuriosidadeVisivel(null)}
     >
-      {mostrarModalReset && (
-        <div className="pacote-overlay">
-          <div className="pacote-conteudo" style={{ maxWidth: '400px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '1.8rem', marginBottom: '10px' }}>🔄 Recomeçar Álbum</h2>
-            <p style={{ fontSize: '1rem', color: '#555' }}>
-              Tem certeza que deseja recomeçar todo o progresso?<br />
-              Suas figurinhas e estatísticas serão <strong>zeradas</strong>.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
-              <button
-                onClick={() => setMostrarModalReset(false)}
-                className="btn-concluir"
-                style={{ backgroundColor: '#ccc', color: '#000', padding: '12px 24px', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarReset}
-                className="btn-concluir"
-                style={{ backgroundColor: '#ef4444', color: '#fff', padding: '12px 24px', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                Sim, recomeçar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {albumCompleto && (
         <div className="album-completo-card">
           <div className="card-header">✨ Parabéns! Álbum completo</div>
@@ -753,33 +706,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '40px' }}>
-        <button
-          onClick={() => setMostrarModalReset(true)}
-          style={{
-            background: 'none',
-            border: '1px solid #ef4444',
-            color: '#ef4444',
-            padding: '10px 20px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '0.9em',
-            fontWeight: 'bold',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#ef4444';
-            e.currentTarget.style.color = '#fff';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = '#ef4444';
-          }}
-        >
-          🔄 Recomeçar Álbum
-        </button>
-      </div>
     </div>
   );
 }
